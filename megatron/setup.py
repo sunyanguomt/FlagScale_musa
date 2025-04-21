@@ -6,7 +6,9 @@ import importlib.util
 import os
 import setuptools
 
-spec = importlib.util.spec_from_file_location('package_info', 'megatron/core/package_info.py')
+spec = importlib.util.spec_from_file_location(
+    "package_info", "megatron/core/package_info.py"
+)
 package_info = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(package_info)
 
@@ -23,13 +25,13 @@ __repository_url__ = package_info.__repository_url__
 __version__ = package_info.__version__
 
 
-if os.path.exists('megatron/core/README.md'):
-    with open("megatron/core/README.md", "r", encoding='utf-8') as fh:
+if os.path.exists("megatron/core/README.md"):
+    with open("megatron/core/README.md", "r", encoding="utf-8") as fh:
         long_description = fh.read()
     long_description_content_type = "text/markdown"
 
 else:
-    long_description = 'See ' + __homepage__
+    long_description = "See " + __homepage__
     long_description_content_type = "text/plain"
 
 
@@ -37,12 +39,14 @@ else:
 #                             Dependency Loading                              #
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% #
 
+
 def req_file(filename, folder="megatron/core"):
-    with open(os.path.join(folder, filename), encoding='utf-8') as f:
+    with open(os.path.join(folder, filename), encoding="utf-8") as f:
         content = f.readlines()
     # you may also want to remove whitespace characters
     # Example: `\n` at the end of each line
     return [x.strip() for x in content]
+
 
 install_requires = req_file("requirements.txt")
 
@@ -77,33 +81,36 @@ setuptools.setup(
         #  5 - Production/Stable
         #  6 - Mature
         #  7 - Inactive
-        'Development Status :: 5 - Production/Stable',
+        "Development Status :: 5 - Production/Stable",
         # Indicate who your project is intended for
-        'Intended Audience :: Developers',
-        'Intended Audience :: Science/Research',
-        'Intended Audience :: Information Technology',
+        "Intended Audience :: Developers",
+        "Intended Audience :: Science/Research",
+        "Intended Audience :: Information Technology",
         # Indicate what your project relates to
-        'Topic :: Scientific/Engineering',
-        'Topic :: Scientific/Engineering :: Mathematics',
-        'Topic :: Scientific/Engineering :: Image Recognition',
-        'Topic :: Scientific/Engineering :: Artificial Intelligence',
-        'Topic :: Software Development :: Libraries',
-        'Topic :: Software Development :: Libraries :: Python Modules',
-        'Topic :: Utilities',
+        "Topic :: Scientific/Engineering",
+        "Topic :: Scientific/Engineering :: Mathematics",
+        "Topic :: Scientific/Engineering :: Image Recognition",
+        "Topic :: Scientific/Engineering :: Artificial Intelligence",
+        "Topic :: Software Development :: Libraries",
+        "Topic :: Software Development :: Libraries :: Python Modules",
+        "Topic :: Utilities",
         # Pick your license as you wish (should match "license" above)
-        'License :: OSI Approved :: BSD License',
+        "License :: OSI Approved :: BSD License",
         # Supported python versions
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9',
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
         # Additional Setting
-        'Environment :: Console',
-        'Natural Language :: English',
-        'Operating System :: OS Independent',
+        "Environment :: Console",
+        "Natural Language :: English",
+        "Operating System :: OS Independent",
     ],
-    packages=['megatron.core', 'megatron.core.pipeline_parallel', 'megatron.core.tensor_parallel'], 
+    packages=[
+        "megatron.core",
+        "megatron.core.pipeline_parallel",
+        "megatron.core.tensor_parallel",
+    ],
     install_requires=install_requires,
-
     # Add in any packaged data.
     include_package_data=True,
     # PyPI package information.

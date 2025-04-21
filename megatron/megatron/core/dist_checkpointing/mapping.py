@@ -76,8 +76,8 @@ class ShardedTensor:
     def global_coordinates(self) -> Tuple[np.ndarray, ...]:
         if self.flattened_range is None:
             raise CheckpointingException(
-                f'`global_coordinates` is undefined for'
-                f' {self.__class__.__name__} without `flattened_range`'
+                f"`global_coordinates` is undefined for"
+                f" {self.__class__.__name__} without `flattened_range`"
             )
 
         local_coords = self.local_coordinates()
@@ -87,15 +87,17 @@ class ShardedTensor:
         )
         global_coords = tuple(
             c + off
-            for c, off in zip((0,) * self.prepend_axis_num + local_coords, self.global_offset)
+            for c, off in zip(
+                (0,) * self.prepend_axis_num + local_coords, self.global_offset
+            )
         )
         return global_coords
 
     def local_coordinates(self) -> Tuple[np.ndarray, ...]:
         if self.flattened_range is None:
             raise CheckpointingException(
-                f'`local_coordinates` is undefined for'
-                f' {self.__class__.__name__} without `flattened_range`'
+                f"`local_coordinates` is undefined for"
+                f" {self.__class__.__name__} without `flattened_range`"
             )
 
         # TODO: np.unravel_index?
@@ -108,7 +110,8 @@ class ShardedTensor:
         for axis_sh, axis_fragm in zip(self.global_shape, self.axis_fragmentations):
             if not self.allow_shape_mismatch and axis_sh % axis_fragm != 0:
                 raise CheckpointingException(
-                    f'Axis shape ({axis_sh}) not divisible' f' by axis fragmentation ({axis_fragm}'
+                    f"Axis shape ({axis_sh}) not divisible"
+                    f" by axis fragmentation ({axis_fragm}"
                 )
             axis_chunk_size = axis_sh // axis_fragm
             chunks.append(axis_chunk_size)
@@ -151,12 +154,14 @@ class ShardedTensor:
             )
             assert (
                 axis_rank_offset < axis_fragm
-            ), 'Rank offset must be lower than axis fragmentation'
+            ), "Rank offset must be lower than axis fragmentation"
             if axis in _seen_axis:
-                raise CheckpointingException('Duplicated axis specified')
+                raise CheckpointingException("Duplicated axis specified")
             _seen_axis.add(axis)
 
-            local_axis_shape = 1 if axis < prepend_axis_num else data.shape[axis - prepend_axis_num]
+            local_axis_shape = (
+                1 if axis < prepend_axis_num else data.shape[axis - prepend_axis_num]
+            )
             global_shape[axis] = axis_fragm * local_axis_shape
             global_offset[axis] = axis_rank_offset * local_axis_shape
             axis_fragmentations[axis] = axis_fragm
@@ -175,7 +180,7 @@ class ShardedTensor:
         )
 
     def __str__(self):
-        return f'{self.__class__.__name__}(key=\'{self.key}\')'
+        return f"{self.__class__.__name__}(key='{self.key}')"
 
 
 def is_main_replica(replica_id):
@@ -235,4 +240,4 @@ class ShardedObject:
         return f'{self.key}/shard_{".".join(map(str, self.global_offset))}_{".".join(map(str, self.global_shape))}'
 
     def __str__(self):
-        return f'{self.__class__.__name__}(key=\'{self.key}\')'
+        return f"{self.__class__.__name__}(key='{self.key}')"

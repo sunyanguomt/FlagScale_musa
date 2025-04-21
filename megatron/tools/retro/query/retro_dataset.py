@@ -14,22 +14,24 @@ from .utils import get_neighbor_dirname
 
 
 class RetroDataset(torch.utils.data.Dataset):
-    '''Dataset of retro samples.
+    """Dataset of retro samples.
 
     Each sample contains the original GPT sample, along with the token IDs
     of each neighbor of each chunk within the sequence. Neighbor array has
     shape (num_chunks_per_sample, num_neighbors, num_retrieved_tokens).
-    '''
+    """
 
-    def __init__(self,
-                 num_neighbors,
-                 num_retrieved_chunks,
-                 block_size,
-                 db_dataset,
-                 chunk_dataset,
-                 neighbor_path_map):
-        '''Note: chunk dataset wraps original GPT dataset (see
-        chunk_dataset.py).'''
+    def __init__(
+        self,
+        num_neighbors,
+        num_retrieved_chunks,
+        block_size,
+        db_dataset,
+        chunk_dataset,
+        neighbor_path_map,
+    ):
+        """Note: chunk dataset wraps original GPT dataset (see
+        chunk_dataset.py)."""
 
         super().__init__()
 
@@ -51,10 +53,12 @@ class RetroDataset(torch.utils.data.Dataset):
         sample = self.chunk_dataset.sample_dataset[sample_idx]
 
         # Sample idx to chunk idxs.
-        chunk_idxs = list(range(
-            sample_idx * n_chunks_per_sample,
-            (sample_idx + 1) * n_chunks_per_sample,
-        ))
+        chunk_idxs = list(
+            range(
+                sample_idx * n_chunks_per_sample,
+                (sample_idx + 1) * n_chunks_per_sample,
+            )
+        )
 
         # Collect retrieved tokens.
         all_retrieved_chunk_ids = []
@@ -64,8 +68,9 @@ class RetroDataset(torch.utils.data.Dataset):
             # Neighbor chunk ids.
             neighbor_path = self.neighbor_path_map[chunk_idx]
             with h5py.File(neighbor_path, "r") as f:
-                neighbor_chunk_ids = f["neighbors"] \
-                    [chunk_idx % self.block_size, :self.num_neighbors].tolist()
+                neighbor_chunk_ids = f["neighbors"][
+                    chunk_idx % self.block_size, : self.num_neighbors
+                ].tolist()
 
             # Retrieved (neighbor + continuation) token ids.
             retrieved_chunk_ids = []
@@ -74,10 +79,12 @@ class RetroDataset(torch.utils.data.Dataset):
                 current_chunk_ids = [
                     i % len(self.db_dataset)
                     for i in range(
-                            neighbor_chunk_id,
-                            neighbor_chunk_id + self.num_retrieved_chunks)]
-                current_token_ids = [self.db_dataset[ci]["text"]
-                                     for ci in current_chunk_ids]
+                        neighbor_chunk_id, neighbor_chunk_id + self.num_retrieved_chunks
+                    )
+                ]
+                current_token_ids = [
+                    self.db_dataset[ci]["text"] for ci in current_chunk_ids
+                ]
                 retrieved_chunk_ids.append(current_chunk_ids)
                 retrieved_token_ids.append(current_token_ids)
 
@@ -86,23 +93,25 @@ class RetroDataset(torch.utils.data.Dataset):
             all_retrieved_token_ids.append(retrieved_token_ids)
 
         # Reshape retrieved tokens.
-        all_retrieved_chunk_ids = np.array(all_retrieved_chunk_ids) \
-            .reshape((n_chunks_per_sample, self.num_neighbors, -1))
-        all_retrieved_token_ids = np.array(all_retrieved_token_ids) \
-            .reshape((n_chunks_per_sample, self.num_neighbors, -1))
+        all_retrieved_chunk_ids = np.array(all_retrieved_chunk_ids).reshape(
+            (n_chunks_per_sample, self.num_neighbors, -1)
+        )
+        all_retrieved_token_ids = np.array(all_retrieved_token_ids).reshape(
+            (n_chunks_per_sample, self.num_neighbors, -1)
+        )
 
         # Sample.
         sample = {
             **sample,
-            "neighbor_chunks" : all_retrieved_chunk_ids,
-            "neighbor_tokens" : all_retrieved_token_ids,
+            "neighbor_chunks": all_retrieved_chunk_ids,
+            "neighbor_tokens": all_retrieved_token_ids,
         }
 
         return sample
 
 
 def get_retro_datasets(verify_sizes=True):
-    '''Get train, valid, test retro datasets.'''
+    """Get train, valid, test retro datasets."""
 
     args = get_args()
     retro_args = get_retro_args()
@@ -117,14 +126,15 @@ def get_retro_datasets(verify_sizes=True):
 
         chunk_dataset = chunk_ds_info["data"]
         neighbor_dir = chunk_ds_info["neighbor_dir"]
-        neighbor_path_map = BlockPathMap.from_dir(neighbor_dir,
-                                                  retro_args.retro_block_size)
+        neighbor_path_map = BlockPathMap.from_dir(
+            neighbor_dir, retro_args.retro_block_size
+        )
 
         # Verify dataset prefixes.
         expected_dir = get_neighbor_dirname(data_key, chunk_dataset.sample_dataset)
-        assert expected_dir == neighbor_dir, \
-            "inconsistent dataset source; '%s' vs. '%s'." % \
-            (expected_dir, neighbor_dir)
+        assert (
+            expected_dir == neighbor_dir
+        ), "inconsistent dataset source; '%s' vs. '%s'." % (expected_dir, neighbor_dir)
 
         # Verify num chunks.
         n_sample_chunks = len(chunk_dataset)
@@ -132,11 +142,12 @@ def get_retro_datasets(verify_sizes=True):
 
         if not os.path.isdir(neighbor_dir):
             if torch.distributed.get_rank() == 0:
-                raise Exception("neighbor directory '%s' not found; please "
-                                "compare --train-samples, --seq-length, --seed, "
-                                "--eval-iters, and --eval-interval, with "
-                                "retro preprocessing args." %
-                                neighbor_dir)
+                raise Exception(
+                    "neighbor directory '%s' not found; please "
+                    "compare --train-samples, --seq-length, --seed, "
+                    "--eval-iters, and --eval-interval, with "
+                    "retro preprocessing args." % neighbor_dir
+                )
             torch.distributed.barrier()
             exit()
 
@@ -144,10 +155,11 @@ def get_retro_datasets(verify_sizes=True):
             if torch.distributed.get_rank() == 0:
                 print("neighbor_dir : %s" % neighbor_dir)
                 print("neighbor_path_map : %s" % neighbor_path_map)
-                raise Exception("num sampled chunks (%d) != num neighbor chunks "
-                                "(%d); did you complete querying the entire "
-                                "pretraining dataset?"
-                                % (n_sample_chunks, n_neighbor_chunks))
+                raise Exception(
+                    "num sampled chunks (%d) != num neighbor chunks "
+                    "(%d); did you complete querying the entire "
+                    "pretraining dataset?" % (n_sample_chunks, n_neighbor_chunks)
+                )
             torch.distributed.barrier()
             exit()
 

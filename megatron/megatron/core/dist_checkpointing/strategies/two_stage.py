@@ -35,12 +35,12 @@ def timed(verbose=True):
         @wraps(fn)
         def wrapped(*args, **kwargs):
             if verbose:
-                logger.debug(f'{name} init')
+                logger.debug(f"{name} init")
             start = time.time()
             ret = fn(*args, **kwargs)
             took = time.time() - start
             if verbose:
-                logger.debug(f'{name} took {took}s')
+                logger.debug(f"{name} took {took}s")
             timers[name].append(took)
             return ret
 
@@ -66,7 +66,7 @@ def sharded_tensor_chunk_id(sharded_tensor: ShardedTensor):
 
 
 class TwoStageDataParallelLoadShardedStrategy(LoadShardedStrategy):
-    """ Loads one checkpoint replica from storage and broadcasts to other nodes.
+    """Loads one checkpoint replica from storage and broadcasts to other nodes.
 
     This strategy loads checkpoint from storage on minimal set of nodes
     and distributes the checkpoint to other nodes with torch.distributed.
@@ -107,33 +107,37 @@ class TwoStageDataParallelLoadShardedStrategy(LoadShardedStrategy):
     def load(self, sharded_state_dict: ShardedStateDict, checkpoint_dir: Path):
         self.maybe_init_gloo_group()
         all_tensors_sorted = self._build_load_plan(sharded_state_dict)
-        self._exchange_loaded_tensors(all_tensors_sorted, sharded_state_dict, checkpoint_dir)
+        self._exchange_loaded_tensors(
+            all_tensors_sorted, sharded_state_dict, checkpoint_dir
+        )
         self.summarize_load_times()
         return sharded_state_dict
 
     def summarize_load_times(self):
         torch.distributed.barrier()
-        logger.info('Checkpoint loading finished. Summary:')
+        logger.info("Checkpoint loading finished. Summary:")
         for key, times in sorted(timers.items()):
             times_sum = sum(times)
-            max_times = torch.tensor([times_sum], device='cuda')
-            avg_times = torch.tensor([times_sum], device='cuda')
+            max_times = torch.tensor([times_sum], device="cuda")
+            avg_times = torch.tensor([times_sum], device="cuda")
             torch.distributed.all_reduce(max_times, op=torch.distributed.ReduceOp.MAX)
             torch.distributed.all_reduce(avg_times, op=torch.distributed.ReduceOp.SUM)
             avg_times /= torch.distributed.get_world_size()
             if torch.distributed.get_rank() == 0:
-                logger.info(f'{key}: max {max_times[0]}, avg {avg_times[0]}')
+                logger.info(f"{key}: max {max_times[0]}, avg {avg_times[0]}")
 
     @timed(verbose=False)
-    def load_tensor_from_storage(self, checkpoint_dir, ten_meta: _ShardedTensorMetadata):
-        logger.debug(f'_load_from_array({ten_meta.sharded_tensor_no_data.key}) init')
+    def load_tensor_from_storage(
+        self, checkpoint_dir, ten_meta: _ShardedTensorMetadata
+    ):
+        logger.debug(f"_load_from_array({ten_meta.sharded_tensor_no_data.key}) init")
         ret = _load_from_array(
             ten_meta.sharded_tensor_no_data,
             checkpoint_dir,
             load_directly_on_device=False,
             apply_flattened_range=False,
         )
-        logger.debug(f'_load_from_array({ten_meta.sharded_tensor_no_data.key}) DONE')
+        logger.debug(f"_load_from_array({ten_meta.sharded_tensor_no_data.key}) DONE")
         return ret
 
     @timed()
@@ -144,10 +148,12 @@ class TwoStageDataParallelLoadShardedStrategy(LoadShardedStrategy):
         torch.distributed.all_gather_object(all_groups, self.dp_group_ranks)
         all_groups = set(tuple(sorted(gr)) for gr in all_groups)
         for group_ranks in sorted(all_groups):
-            gloo_pg = torch.distributed.new_group(ranks=group_ranks, backend='gloo')
+            gloo_pg = torch.distributed.new_group(ranks=group_ranks, backend="gloo")
             if self.global_rank in group_ranks:
                 self.data_parallel_group = gloo_pg
-                assert self.dp_group_rank == torch.distributed.get_rank(self.data_parallel_group)
+                assert self.dp_group_rank == torch.distributed.get_rank(
+                    self.data_parallel_group
+                )
 
     def check_backend_compatibility(self, loaded_version):
         pass  # TODO
@@ -168,15 +174,19 @@ class TwoStageDataParallelLoadShardedStrategy(LoadShardedStrategy):
             )
             for sharded_ten in nested_values(sharded_state_dict)
         ]
-        all_meta = [None] * torch.distributed.get_world_size(group=self.data_parallel_group)
-        torch.distributed.all_gather_object(all_meta, local_meta, group=self.data_parallel_group)
+        all_meta = [None] * torch.distributed.get_world_size(
+            group=self.data_parallel_group
+        )
+        torch.distributed.all_gather_object(
+            all_meta, local_meta, group=self.data_parallel_group
+        )
         all_meta = list(chain.from_iterable(all_meta))
         all_tensors_sorted = self.deduplicate_chunks(all_meta)
         return all_tensors_sorted
 
     @timed()
     def deduplicate_chunks(self, ten_metas: List[_ShardedTensorMetadata]):
-        """ Group tensors by chunk and then pick the tensor with the lowest rank.
+        """Group tensors by chunk and then pick the tensor with the lowest rank.
 
         NOTE: with proper loading overlap, loading from randomized ranks
          (instead of the smallest one) could be beneficial here.
@@ -184,16 +194,19 @@ class TwoStageDataParallelLoadShardedStrategy(LoadShardedStrategy):
         ten_metas = map_reduce(
             ten_metas,
             key_fn=lambda meta: sharded_tensor_chunk_id(meta.sharded_tensor_no_data),
-            reduce_fn=partial(min, key=attrgetter('dist_group_rank')),
+            reduce_fn=partial(min, key=attrgetter("dist_group_rank")),
         )
         all_metas_sorted = list(map(itemgetter(1), sorted(ten_metas.items())))
         return all_metas_sorted
 
     @timed()
     def _exchange_loaded_tensors(
-        self, ten_metas: List[_ShardedTensorMetadata], sharded_state_dict, checkpoint_dir
+        self,
+        ten_metas: List[_ShardedTensorMetadata],
+        sharded_state_dict,
+        checkpoint_dir,
     ):
-        logger.debug(f'_exchange_loaded_tensors, num ten_metas: {len(ten_metas)}')
+        logger.debug(f"_exchange_loaded_tensors, num ten_metas: {len(ten_metas)}")
         for ten_meta in ten_metas:
 
             src_rank = torch.distributed.get_global_rank(
@@ -201,25 +214,29 @@ class TwoStageDataParallelLoadShardedStrategy(LoadShardedStrategy):
             )
 
             if self.dp_group_rank == ten_meta.dist_group_rank:
-                exchange_tensor = self.load_tensor_from_storage(checkpoint_dir, ten_meta)
+                exchange_tensor = self.load_tensor_from_storage(
+                    checkpoint_dir, ten_meta
+                )
                 if not self.cpu_transfer:
                     exchange_tensor = exchange_tensor.cuda()
             else:
                 # TODO: for non-flattened ranges we could reuse the buffer from the start here
                 exchange_tensor = torch.empty(
                     ten_meta.sharded_tensor_no_data.local_shape,
-                    device='cpu' if self.cpu_transfer else 'cuda',
+                    device="cpu" if self.cpu_transfer else "cuda",
                     dtype=ten_meta.sharded_tensor_no_data.dtype,
                 )
 
             logger.debug(
-                f'exchange {ten_meta.sharded_tensor_no_data.key}, {exchange_tensor.shape}({exchange_tensor.numel()}), broadcast({src_rank} -> {self.dp_group_ranks})'
+                f"exchange {ten_meta.sharded_tensor_no_data.key}, {exchange_tensor.shape}({exchange_tensor.numel()}), broadcast({src_rank} -> {self.dp_group_ranks})"
             )
             torch.distributed.broadcast(
                 exchange_tensor, group=self.data_parallel_group, src=src_rank
             )
-            self._distribute_data_to_state_dict(ten_meta, exchange_tensor, sharded_state_dict)
-            logger.debug(f'exchange {ten_meta.sharded_tensor_no_data.key} done')
+            self._distribute_data_to_state_dict(
+                ten_meta, exchange_tensor, sharded_state_dict
+            )
+            logger.debug(f"exchange {ten_meta.sharded_tensor_no_data.key} done")
 
             # free buffer memory
             exchange_tensor = None
@@ -234,7 +251,10 @@ class TwoStageDataParallelLoadShardedStrategy(LoadShardedStrategy):
         tensor_key = sharded_tensor_chunk_id(ten_meta.sharded_tensor_no_data)
 
         def _fill_in_data(t: Union[ShardedTensor, torch.Tensor]):
-            if not isinstance(t, ShardedTensor) or sharded_tensor_chunk_id(t) != tensor_key:
+            if (
+                not isinstance(t, ShardedTensor)
+                or sharded_tensor_chunk_id(t) != tensor_key
+            ):
                 # already filled-in or key not matching
                 return t
             sharded_tensor: ShardedTensor = t

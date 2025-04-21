@@ -11,20 +11,22 @@ import megatron.optimizer
 from megatron.core import mpu
 
 
-def adamw_torch(params: List[Tensor],
-          grads: List[Tensor],
-          exp_avgs: List[Tensor],
-          exp_avg_sqs: List[Tensor],
-          max_exp_avg_sqs: List[Tensor],
-          state_steps: List[int],
-          *,
-          amsgrad: bool,
-          beta1: float,
-          beta2: float,
-          lr: float,
-          weight_decay: float,
-          eps: float,
-          maximize: bool):
+def adamw_torch(
+    params: List[Tensor],
+    grads: List[Tensor],
+    exp_avgs: List[Tensor],
+    exp_avg_sqs: List[Tensor],
+    max_exp_avg_sqs: List[Tensor],
+    state_steps: List[int],
+    *,
+    amsgrad: bool,
+    beta1: float,
+    beta2: float,
+    lr: float,
+    weight_decay: float,
+    eps: float,
+    maximize: bool
+):
     r"""Functional API that performs AdamW algorithm computation.
     See :class:`~torch.optim.AdamW` for details.
     """
@@ -37,8 +39,8 @@ def adamw_torch(params: List[Tensor],
         # Perform stepweight decay
         param.mul_(1 - lr * weight_decay)
 
-        bias_correction1 = 1 - beta1 ** step
-        bias_correction2 = 1 - beta2 ** step
+        bias_correction1 = 1 - beta1**step
+        bias_correction2 = 1 - beta2**step
 
         # Decay the first and second moment running average coefficient
         exp_avg.mul_(beta1).add_(grad, alpha=1 - beta1)
@@ -56,20 +58,22 @@ def adamw_torch(params: List[Tensor],
         param.addcdiv_(exp_avg, denom, value=-step_size)
 
 
-def adamw(params: List[Tensor],
-          grads: List[Tensor],
-          exp_avgs: List[Tensor],
-          exp_avg_sqs: List[Tensor],
-          max_exp_avg_sqs: List[Tensor],
-          state_steps: List[int],
-          *,
-          amsgrad: bool,
-          beta1: float,
-          beta2: float,
-          lr: float,
-          weight_decay: float,
-          eps: float,
-          maximize: bool):
+def adamw(
+    params: List[Tensor],
+    grads: List[Tensor],
+    exp_avgs: List[Tensor],
+    exp_avg_sqs: List[Tensor],
+    max_exp_avg_sqs: List[Tensor],
+    state_steps: List[int],
+    *,
+    amsgrad: bool,
+    beta1: float,
+    beta2: float,
+    lr: float,
+    weight_decay: float,
+    eps: float,
+    maximize: bool
+):
     r"""Functional API that performs AdamW algorithm computation.
     See :class:`~torch.optim.AdamW` for details.
     """
@@ -85,19 +89,19 @@ def adamw(params: List[Tensor],
         bias_correction2 = beta2 ** (step - 1)
 
         param.data, exp_avg, exp_avg_sq = torch_npu.npu_apply_adam_w(
-                bias_correction1,
-                bias_correction2,
-                lr,
-                weight_decay,
-                beta1,
-                beta2,
-                eps,
-                grad,
-                None,
-                amsgrad,
-                maximize,
-                out=(param.data, exp_avg, exp_avg_sq)
-                )
+            bias_correction1,
+            bias_correction2,
+            lr,
+            weight_decay,
+            beta1,
+            beta2,
+            eps,
+            grad,
+            None,
+            amsgrad,
+            maximize,
+            out=(param.data, exp_avg, exp_avg_sq),
+        )
 
 
 class AdamW(Optimizer):
@@ -152,8 +156,17 @@ class AdamW(Optimizer):
             minimizing (default: False)
     """
 
-    def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8,
-                 weight_decay=1e-2, amsgrad=False, *, maximize: bool = False):
+    def __init__(
+        self,
+        params,
+        lr=1e-3,
+        betas=(0.9, 0.999),
+        eps=1e-8,
+        weight_decay=1e-2,
+        amsgrad=False,
+        *,
+        maximize: bool = False
+    ):
         if not 0.0 <= lr:
             raise ValueError("Invalid learning rate: {}".format(lr))
         if not 0.0 <= eps:
@@ -164,15 +177,21 @@ class AdamW(Optimizer):
             raise ValueError("Invalid beta parameter at index 1: {}".format(betas[1]))
         if not 0.0 <= weight_decay:
             raise ValueError("Invalid weight_decay value: {}".format(weight_decay))
-        defaults = dict(lr=lr, betas=betas, eps=eps,
-                        weight_decay=weight_decay, amsgrad=amsgrad, maximize=maximize)
+        defaults = dict(
+            lr=lr,
+            betas=betas,
+            eps=eps,
+            weight_decay=weight_decay,
+            amsgrad=amsgrad,
+            maximize=maximize,
+        )
         super(AdamW, self).__init__(params, defaults)
 
     def __setstate__(self, state):
         super(AdamW, self).__setstate__(state)
         for group in self.param_groups:
-            group.setdefault('amsgrad', False)
-            group.setdefault('maximize', False)
+            group.setdefault("amsgrad", False)
+            group.setdefault("maximize", False)
 
     @torch.no_grad()
     def step(self, closure=None):
@@ -194,55 +213,63 @@ class AdamW(Optimizer):
             state_sums = []
             max_exp_avg_sqs = []
             state_steps = []
-            amsgrad = group['amsgrad']
-            beta1, beta2 = group['betas']
+            amsgrad = group["amsgrad"]
+            beta1, beta2 = group["betas"]
 
-            for p in group['params']:
+            for p in group["params"]:
                 if p.grad is None:
                     continue
                 params_with_grad.append(p)
                 if p.grad.is_sparse:
-                    raise RuntimeError('AdamW does not support sparse gradients')
+                    raise RuntimeError("AdamW does not support sparse gradients")
                 grads.append(p.grad)
 
                 state = self.state[p]
 
                 # State initialization
                 if len(state) == 0:
-                    state['step'] = 0
+                    state["step"] = 0
                     # Exponential moving average of gradient values
-                    state['exp_avg'] = torch.zeros_like(p, memory_format=torch.preserve_format)
+                    state["exp_avg"] = torch.zeros_like(
+                        p, memory_format=torch.preserve_format
+                    )
                     # Exponential moving average of squared gradient values
-                    state['exp_avg_sq'] = torch.zeros_like(p, memory_format=torch.preserve_format)
+                    state["exp_avg_sq"] = torch.zeros_like(
+                        p, memory_format=torch.preserve_format
+                    )
                     if amsgrad:
                         # Maintains max of all exp. moving avg. of sq. grad. values
-                        state['max_exp_avg_sq'] = torch.zeros_like(p, memory_format=torch.preserve_format)
+                        state["max_exp_avg_sq"] = torch.zeros_like(
+                            p, memory_format=torch.preserve_format
+                        )
 
-                exp_avgs.append(state['exp_avg'])
-                exp_avg_sqs.append(state['exp_avg_sq'])
+                exp_avgs.append(state["exp_avg"])
+                exp_avg_sqs.append(state["exp_avg_sq"])
 
                 if amsgrad:
-                    max_exp_avg_sqs.append(state['max_exp_avg_sq'])
+                    max_exp_avg_sqs.append(state["max_exp_avg_sq"])
 
                 # update the steps for each param group update
-                state['step'] += 1
+                state["step"] += 1
                 # record the step after step update
-                state_steps.append(state['step'])
+                state_steps.append(state["step"])
 
             # adamw_torch(params_with_grad,
-            adamw(params_with_grad,
-                    grads,
-                    exp_avgs,
-                    exp_avg_sqs,
-                    max_exp_avg_sqs,
-                    state_steps,
-                    amsgrad=amsgrad,
-                    beta1=beta1,
-                    beta2=beta2,
-                    lr=group['lr'],
-                    weight_decay=group['weight_decay'],
-                    eps=group['eps'],
-                    maximize=group['maximize'])
+            adamw(
+                params_with_grad,
+                grads,
+                exp_avgs,
+                exp_avg_sqs,
+                max_exp_avg_sqs,
+                state_steps,
+                amsgrad=amsgrad,
+                beta1=beta1,
+                beta2=beta2,
+                lr=group["lr"],
+                weight_decay=group["weight_decay"],
+                eps=group["eps"],
+                maximize=group["maximize"],
+            )
 
         return loss
 
@@ -250,21 +277,51 @@ class AdamW(Optimizer):
 def _unscale_main_grads_and_check_for_nan(self):
     main_grads = self._collect_main_grad_data_for_unscaling()
     self.found_inf.fill_(0.0)
-    torch._amp_foreach_non_finite_check_and_unscale_(main_grads, self.found_inf, self.grad_scaler.inv_scale)
-    torch.distributed.all_reduce(self.found_inf, op=torch.distributed.ReduceOp.MAX, group=self.get_model_parallel_group())
-    torch.distributed.all_reduce(self.found_inf, op=torch.distributed.ReduceOp.MAX, group=mpu.get_data_parallel_group())
-    found_inf_flag = (self.found_inf.item() > 0)
+    torch._amp_foreach_non_finite_check_and_unscale_(
+        main_grads, self.found_inf, self.grad_scaler.inv_scale
+    )
+    torch.distributed.all_reduce(
+        self.found_inf,
+        op=torch.distributed.ReduceOp.MAX,
+        group=self.get_model_parallel_group(),
+    )
+    torch.distributed.all_reduce(
+        self.found_inf,
+        op=torch.distributed.ReduceOp.MAX,
+        group=mpu.get_data_parallel_group(),
+    )
+    found_inf_flag = self.found_inf.item() > 0
     return found_inf_flag
 
 
-def Float16OptimizerWithFloat16ParamsInit(self, optimizer, clip_grad, log_num_zeros_in_grad,
-             params_have_main_grad, use_contiguous_buffers_in_local_ddp,
-             fp16, bf16, params_dtype, grad_scaler, models):
-    print("111111============================================================================")
+def Float16OptimizerWithFloat16ParamsInit(
+    self,
+    optimizer,
+    clip_grad,
+    log_num_zeros_in_grad,
+    params_have_main_grad,
+    use_contiguous_buffers_in_local_ddp,
+    fp16,
+    bf16,
+    params_dtype,
+    grad_scaler,
+    models,
+):
+    print(
+        "111111============================================================================"
+    )
     super().__init__(
-        optimizer, clip_grad, log_num_zeros_in_grad,
-        params_have_main_grad, use_contiguous_buffers_in_local_ddp,
-        fp16, bf16, params_dtype, grad_scaler, models)
+        optimizer,
+        clip_grad,
+        log_num_zeros_in_grad,
+        params_have_main_grad,
+        use_contiguous_buffers_in_local_ddp,
+        fp16,
+        bf16,
+        params_dtype,
+        grad_scaler,
+        models,
+    )
 
     # ======================
     # main parameter stuff
@@ -284,54 +341,63 @@ def Float16OptimizerWithFloat16ParamsInit(self, optimizer, clip_grad, log_num_ze
         fp32_params_this_group = []
         fp32_from_float16_params_this_group = []
         # For all the parameters in this group:
-        for i, param in enumerate(param_group['params']):
+        for i, param in enumerate(param_group["params"]):
             if param.requires_grad:
 
                 # float16 params:
-                if param.type() in ['torch.cuda.HalfTensor',
-                                    'torch.cuda.BFloat16Tensor',
-                                    'torch.npu.BFloat16Tensor']:
+                if param.type() in [
+                    "torch.cuda.HalfTensor",
+                    "torch.cuda.BFloat16Tensor",
+                    "torch.npu.BFloat16Tensor",
+                ]:
                     float16_params_this_group.append(param)
                     # Create a copy
                     main_param = param.detach().clone().float()
                     # Copy tensor model parallel attributes.
-                    tensor_parallel.copy_tensor_model_parallel_attributes(main_param,
-                                                                          param)
-                    if hasattr(param, 'shared'):
+                    tensor_parallel.copy_tensor_model_parallel_attributes(
+                        main_param, param
+                    )
+                    if hasattr(param, "shared"):
                         main_param.shared = param.shared
                     # Replace the optimizer params with the new fp32 copy.
-                    param_group['params'][i] = main_param
+                    param_group["params"][i] = main_param
 
                     fp32_from_float16_params_this_group.append(main_param)
                     # Reset existing state dict key to the new main param.
                     if param in self.optimizer.state:
-                        self.optimizer.state[main_param] \
-                            = self.optimizer.state.pop(param)
+                        self.optimizer.state[main_param] = self.optimizer.state.pop(
+                            param
+                        )
                 # fp32 params.
-                elif param.type() == 'torch.cuda.FloatTensor':
+                elif param.type() == "torch.cuda.FloatTensor":
                     fp32_params_this_group.append(param)
-                    param_group['params'][i] = param
+                    param_group["params"][i] = param
 
                 else:
-                    raise TypeError('Wrapped parameters must be one of '
-                                    'torch.cuda.FloatTensor,  '
-                                    'torch.cuda.HalfTensor, or '
-                                    'torch.cuda.BFloat16Tensor. '
-                                    'torch.npu.BFloat16Tensor. '
-                                    'Received {}'.format(param.type()))
+                    raise TypeError(
+                        "Wrapped parameters must be one of "
+                        "torch.cuda.FloatTensor,  "
+                        "torch.cuda.HalfTensor, or "
+                        "torch.cuda.BFloat16Tensor. "
+                        "torch.npu.BFloat16Tensor. "
+                        "Received {}".format(param.type())
+                    )
 
         self.float16_groups.append(float16_params_this_group)
-        self.fp32_from_float16_groups.append(
-            fp32_from_float16_params_this_group)
+        self.fp32_from_float16_groups.append(fp32_from_float16_params_this_group)
         self.fp32_from_fp32_groups.append(fp32_params_this_group)
 
 
 megatron.optimizer.Adam = AdamW
 
-megatron.optimizer.optimizer.MixedPrecisionOptimizer._unscale_main_grads_and_check_for_nan = _unscale_main_grads_and_check_for_nan
-megatron.optimizer.optimizer.Float16OptimizerWithFloat16Params.__init__ = Float16OptimizerWithFloat16ParamsInit
+megatron.optimizer.optimizer.MixedPrecisionOptimizer._unscale_main_grads_and_check_for_nan = (
+    _unscale_main_grads_and_check_for_nan
+)
+megatron.optimizer.optimizer.Float16OptimizerWithFloat16Params.__init__ = (
+    Float16OptimizerWithFloat16ParamsInit
+)
 
 
 for k, v in sys.modules.items():
-    if 'megatron' in k and hasattr(v, 'Adam'):
-        setattr(v, 'Adam', AdamW)
+    if "megatron" in k and hasattr(v, "Adam"):
+        setattr(v, "Adam", AdamW)

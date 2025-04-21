@@ -1,4 +1,5 @@
-from.device_init import apu_demo_init
+from .device_init import apu_demo_init
+
 apu_demo_init()
 
 # Apply the following patch during the import time

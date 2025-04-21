@@ -1,6 +1,7 @@
 """
 This script is based on Megatron's checkpoint_loader_megatron.py, but it only load the model ckpt without building the model.
 """
+
 import json
 import os
 import sys
@@ -121,7 +122,7 @@ def _load_checkpoint(queue, args):
         margs.model_type = ModelType.encoder_or_decoder
     else:
         raise Exception(f"unrecognized model type: {args.model_type}")
-    
+
     set_global_variables(margs, build_tokenizer=False)
 
     # Get true (non-padded) vocab size
@@ -174,6 +175,7 @@ def _load_checkpoint(queue, args):
     consumed_valid_samples = None
     model_ckpt_paths = get_model_ckpt_paths(md.load, tp_size, pp_size, md.iteration)
     model_ckpts = [[None for _ in range(pp_size)] for _ in range(tp_size)]
+
     def get_model_ckpt(model_ckpts, model_ckpt_paths, tp_rank, pp_rank):
         nonlocal consumed_train_samples
         nonlocal consumed_valid_samples
@@ -183,13 +185,23 @@ def _load_checkpoint(queue, args):
                 model_ckpt_path, map_location="cpu"
             )
             if consumed_train_samples is not None:
-                assert model_ckpts[tp_rank][pp_rank]["args"].consumed_train_samples == consumed_train_samples
+                assert (
+                    model_ckpts[tp_rank][pp_rank]["args"].consumed_train_samples
+                    == consumed_train_samples
+                )
             else:
-                consumed_train_samples = model_ckpts[tp_rank][pp_rank]["args"].consumed_train_samples
+                consumed_train_samples = model_ckpts[tp_rank][pp_rank][
+                    "args"
+                ].consumed_train_samples
             if consumed_valid_samples is not None:
-                assert model_ckpts[tp_rank][pp_rank]["args"].consumed_valid_samples == consumed_valid_samples
+                assert (
+                    model_ckpts[tp_rank][pp_rank]["args"].consumed_valid_samples
+                    == consumed_valid_samples
+                )
             else:
-                consumed_valid_samples = model_ckpts[tp_rank][pp_rank]["args"].consumed_valid_samples
+                consumed_valid_samples = model_ckpts[tp_rank][pp_rank][
+                    "args"
+                ].consumed_valid_samples
             return model_ckpts[tp_rank][pp_rank]
         else:
             return model_ckpts[tp_rank][pp_rank]
@@ -274,8 +286,8 @@ def _load_checkpoint(queue, args):
 
     model_ckpt = get_model_ckpt(model_ckpts, model_ckpt_paths, 0, 0)
     message = {
-        "optimizer": model_ckpt['optimizer'],
-        "opt_param_scheduler": model_ckpt['opt_param_scheduler'], 
+        "optimizer": model_ckpt["optimizer"],
+        "opt_param_scheduler": model_ckpt["opt_param_scheduler"],
     }
     queue_put("optimizer info", message)
 

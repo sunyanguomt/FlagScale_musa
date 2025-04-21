@@ -4,6 +4,7 @@ import torch_npu
 import megatron
 from megatron.core.models.common.rotary_pos_embedding import apply_rotary_pos_emb
 
+
 def apply_rotary_pos_emb(t, freqs):
     """
     input tensor t is of shape [seq_length, ..., dim]
@@ -12,8 +13,11 @@ def apply_rotary_pos_emb(t, freqs):
     """
     return torch_npu.npu_rotary_mul(t, freqs.cos(), freqs.sin())
 
-megatron.core.models.common.rotary_pos_embedding.apply_rotary_pos_emb = apply_rotary_pos_emb
+
+megatron.core.models.common.rotary_pos_embedding.apply_rotary_pos_emb = (
+    apply_rotary_pos_emb
+)
 
 for k, v in sys.modules.items():
-    if 'megatron' in k and hasattr(v, 'apply_rotary_pos_emb'):
-        setattr(v, 'apply_rotary_pos_emb', apply_rotary_pos_emb)
+    if "megatron" in k and hasattr(v, "apply_rotary_pos_emb"):
+        setattr(v, "apply_rotary_pos_emb", apply_rotary_pos_emb)

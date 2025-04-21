@@ -5,6 +5,7 @@ from typing import List, Tuple, Any
 
 class SeparatorStyle(Enum):
     """Different separator style."""
+
     SINGLE = auto()
     TWO = auto()
 
@@ -12,6 +13,7 @@ class SeparatorStyle(Enum):
 @dataclasses.dataclass
 class Conversation:
     """A class that keeps all conversation history."""
+
     system: str
     instruction: str
     roles: List[str]
@@ -54,7 +56,7 @@ class Conversation:
 
     def to_gradio_chatbot(self):
         ret = []
-        for i, (role, msg) in enumerate(self.messages[self.offset:]):
+        for i, (role, msg) in enumerate(self.messages[self.offset :]):
             if i % 2 == 0:
                 ret.append([msg, None])
             else:
@@ -71,7 +73,8 @@ class Conversation:
             sep_style=self.sep_style,
             sep=self.sep,
             sep2=self.sep2,
-            conv_id=self.conv_id)
+            conv_id=self.conv_id,
+        )
 
     def dict(self):
         return {
@@ -88,7 +91,7 @@ class Conversation:
 
 conv_v1 = Conversation(
     system="A chat between a curious human and an artificial intelligence assistant. "
-           "The assistant gives helpful, detailed, and polite answers to the human's questions.",
+    "The assistant gives helpful, detailed, and polite answers to the human's questions.",
     instruction="",
     roles=("Human", "Assistant", "System"),
     messages=(),
@@ -99,7 +102,7 @@ conv_v1 = Conversation(
 
 conv_v1_2 = Conversation(
     system="A chat between a curious human and an artificial intelligence assistant. "
-           "The assistant gives helpful, detailed, and polite answers to the human's questions.",
+    "The assistant gives helpful, detailed, and polite answers to the human's questions.",
     instruction="",
     roles=("Human", "Assistant", "System"),
     messages=(),
@@ -137,6 +140,7 @@ roles = {
     "gpt": default_conversation.roles[1],  # gpt role
 }
 
+
 def get_prompt(sentence):
     conversation = header
     sentence_from = "human"
@@ -152,6 +156,7 @@ def get_prompt(sentence):
     conversation += "### Assistant: "
 
     return conversation
+
 
 if __name__ == "__main__":
     print(default_conversation.get_prompt())

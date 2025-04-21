@@ -71,7 +71,7 @@ class FusedLayerNorm(torch.nn.Module):
 
         if not persist_layer_norm and not HAVE_FUSED_LAYER_NORM:
             # TODO: Add pytorch only layer norm
-            raise ValueError(f'Apex must currently be installed to use megatron core.')
+            raise ValueError(f"Apex must currently be installed to use megatron core.")
 
         if isinstance(hidden_size, numbers.Integral):
             hidden_size = (hidden_size,)
@@ -84,8 +84,8 @@ class FusedLayerNorm(torch.nn.Module):
         self.sequence_parallel = sequence_parallel
 
         # set sequence parallelism flag on weight and bias parameters
-        setattr(self.weight, 'sequence_parallel', self.sequence_parallel)
-        setattr(self.bias, 'sequence_parallel', self.sequence_parallel)
+        setattr(self.weight, "sequence_parallel", self.sequence_parallel)
+        setattr(self.bias, "sequence_parallel", self.sequence_parallel)
 
     def reset_parameters(self):
 

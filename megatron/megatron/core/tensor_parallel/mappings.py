@@ -80,7 +80,9 @@ def _gather_along_last_dim(input_):
 
     tensor_list = [torch.empty_like(input_) for _ in range(world_size)]
     tensor_list[rank] = input_
-    torch.distributed.all_gather(tensor_list, input_, group=get_tensor_model_parallel_group())
+    torch.distributed.all_gather(
+        tensor_list, input_, group=get_tensor_model_parallel_group()
+    )
 
     # Note: torch.cat already creates a contiguous tensor.
     output = torch.cat(tensor_list, dim=last_dim).contiguous()
@@ -99,7 +101,9 @@ def _gather_along_first_dim(input_):
     dim_size = list(input_.size())
     dim_size[0] = dim_size[0] * world_size
 
-    output = torch.empty(dim_size, dtype=input_.dtype, device=torch.cuda.current_device())
+    output = torch.empty(
+        dim_size, dtype=input_.dtype, device=torch.cuda.current_device()
+    )
     torch.distributed._all_gather_base(
         output, input_.contiguous(), group=get_tensor_model_parallel_group()
     )
@@ -121,7 +125,9 @@ def _reduce_scatter_along_first_dim(input_):
 
     dim_size[0] = dim_size[0] // world_size
 
-    output = torch.empty(dim_size, dtype=input_.dtype, device=torch.cuda.current_device())
+    output = torch.empty(
+        dim_size, dtype=input_.dtype, device=torch.cuda.current_device()
+    )
     torch.distributed._reduce_scatter_base(
         output, input_.contiguous(), group=get_tensor_model_parallel_group()
     )

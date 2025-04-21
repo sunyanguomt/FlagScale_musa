@@ -44,7 +44,7 @@ def backward_step(input_tensor, output_tensor, output_tensor_grad, model_type, c
     # connections.
 
     if config.timers is not None:
-        config.timers('backward-compute', log_level=2).start()
+        config.timers("backward-compute", log_level=2).start()
 
     # Retain the grad on the input_tensor.
     unwrap_input_tensor_grad = False
@@ -94,7 +94,7 @@ def backward_step(input_tensor, output_tensor, output_tensor_grad, model_type, c
         input_tensor_grad = input_tensor_grad[0]
 
     if config.timers is not None:
-        config.timers('backward-compute').stop()
+        config.timers("backward-compute").stop()
 
     return input_tensor_grad
 
@@ -121,7 +121,9 @@ def forward_backward_no_pipelining(
     """
 
     if isinstance(model, list):
-        assert len(model) == 1, "non-pipeline-parallel schedule does not support model chunking"
+        assert (
+            len(model) == 1
+        ), "non-pipeline-parallel schedule does not support model chunking"
         model = model[0]
     if isinstance(data_iterator, list):
         assert (
@@ -155,7 +157,9 @@ def forward_backward_no_pipelining(
                 collect_non_loss_data,
             )
             if not forward_only:
-                backward_step(input_tensor, output_tensor, output_tensor_grad, model_type, config)
+                backward_step(
+                    input_tensor, output_tensor, output_tensor_grad, model_type, config
+                )
 
             if not FLAG_SUPPORT_INF_NAN:
                 overflow_flag = get_npu_overflow_flag()
@@ -175,7 +179,9 @@ def forward_backward_no_pipelining(
     )
 
     if not forward_only:
-        backward_step(input_tensor, output_tensor, output_tensor_grad, model_type, config)
+        backward_step(
+            input_tensor, output_tensor, output_tensor_grad, model_type, config
+        )
 
     if not FLAG_SUPPORT_INF_NAN:
         overflow_flag = get_npu_overflow_flag()
@@ -189,12 +195,18 @@ def forward_backward_no_pipelining(
 def deallocate_output_tensor(out, deallocate_pipeline_outputs=False):
     if (out is None) or (not deallocate_pipeline_outputs):
         return
-    assert isinstance(out, torch.Tensor), "expected Tensor, found %s." % type(out).__name__
+    assert isinstance(out, torch.Tensor), (
+        "expected Tensor, found %s." % type(out).__name__
+    )
     assert out._base is None, "counter-productive to free a view of another tensor."
     with torch.no_grad():
         out.set_(torch.empty((1,), device=out.device, dtype=out.dtype))
 
 
 megatron.core.pipeline_parallel.schedules.backward_step = backward_step
-megatron.core.pipeline_parallel.schedules.forward_backward_no_pipelining = forward_backward_no_pipelining
-megatron.core.pipeline_parallel.schedules.deallocate_output_tensor = deallocate_output_tensor
+megatron.core.pipeline_parallel.schedules.forward_backward_no_pipelining = (
+    forward_backward_no_pipelining
+)
+megatron.core.pipeline_parallel.schedules.deallocate_output_tensor = (
+    deallocate_output_tensor
+)

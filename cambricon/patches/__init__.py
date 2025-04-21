@@ -4,7 +4,7 @@ import torch_mlu
 
 # megatron/core/
 from . import core_models_common_rotary_pos_embedding
-from . import core_pipeline_parallel_schedules 
+from . import core_pipeline_parallel_schedules
 from . import core_tensor_parallel_data
 from . import core_tensor_parallel_layer
 from . import core_tensor_parallel_random
@@ -12,8 +12,8 @@ from . import core_tensor_parallel_random
 # megatron/optimizer/
 from . import optimizer_grad_scaler
 from . import optimizer_clip_grads
-from . import optimizer_distrib_optimizer 
-from . import optimizer_optimizer 
+from . import optimizer_distrib_optimizer
+from . import optimizer_optimizer
 
 # megatron/model/
 from . import model_transformer
@@ -22,9 +22,9 @@ from . import model_transformer
 from . import dist_signal_handler
 from . import checkpointing
 from . import initialize
-from . import training 
+from . import training
 
-os.environ['CUDA_DEVICE_MAX_CONNECTIONS'] = '1'
+os.environ["CUDA_DEVICE_MAX_CONNECTIONS"] = "1"
 torch.Tensor.cuda = torch.Tensor.mlu
 torch.cuda.DoubleTensor = torch.mlu.DoubleTensor
 torch.cuda.FloatTensor = torch.mlu.FloatTensor

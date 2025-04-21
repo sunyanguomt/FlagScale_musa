@@ -4,11 +4,11 @@ import megatron
 from megatron.core import tensor_parallel
 from megatron import print_rank_0
 
+
 @classmethod
-def build_model_and_main_param_groups(cls,
-                                        model_gbuf_ranges,
-                                        param_gbuf_map,
-                                        opt_group_ranges):
+def build_model_and_main_param_groups(
+    cls, model_gbuf_ranges, param_gbuf_map, opt_group_ranges
+):
     """
     Create main parameter groups needed for the optimizer step.
 
@@ -45,8 +45,7 @@ def build_model_and_main_param_groups(cls,
         model_fp32_groups.append(model_fp32_params_this_group)
         shard_float16_groups.append(shard_float16_params_this_group)
         shard_fp32_groups.append(shard_fp32_params_this_group)
-        shard_fp32_from_float16_groups.append(
-            shard_fp32_from_float16_params_this_group)
+        shard_fp32_from_float16_groups.append(shard_fp32_from_float16_params_this_group)
 
         for model_param in group_range["params"]:
 
@@ -57,18 +56,23 @@ def build_model_and_main_param_groups(cls,
             param_range = gbuf_range["param_map"][model_param]["param"]
 
             # fp16, bf16 params.
-            if model_param.type() in ['torch.musa.HalfTensor',
-                                        'torch.musa.BFloat16Tensor']:
+            if model_param.type() in [
+                "torch.musa.HalfTensor",
+                "torch.musa.BFloat16Tensor",
+            ]:
 
                 # Clone model -> main.
-                shard_model_param = model_param.detach().view(-1) \
-                    [param_range.start:param_range.end]
+                shard_model_param = model_param.detach().view(-1)[
+                    param_range.start : param_range.end
+                ]
                 shard_main_param = shard_model_param.clone().float()
                 tensor_parallel.copy_tensor_model_parallel_attributes(
-                    shard_model_param, model_param)
+                    shard_model_param, model_param
+                )
                 tensor_parallel.copy_tensor_model_parallel_attributes(
-                    shard_main_param, model_param)
-                if hasattr(model_param, 'shared'):
+                    shard_main_param, model_param
+                )
+                if hasattr(model_param, "shared"):
                     shard_model_param.shared = model_param.shared
                     shard_main_param.shared = model_param.shared
 
@@ -78,23 +82,27 @@ def build_model_and_main_param_groups(cls,
                 shard_fp32_from_float16_params_this_group.append(shard_main_param)
 
             # fp32 params.
-            elif model_param.type() == 'torch.musa.FloatTensor':
-                print('floatoptimizer', flush=True)
-                shard_model_param = model_param.view(-1) \
-                    [param_range.start:param_range.end]
+            elif model_param.type() == "torch.musa.FloatTensor":
+                print("floatoptimizer", flush=True)
+                shard_model_param = model_param.view(-1)[
+                    param_range.start : param_range.end
+                ]
                 model_fp32_params_this_group.append(model_param)
                 shard_fp32_params_this_group.append(shard_model_param)
                 tensor_parallel.copy_tensor_model_parallel_attributes(
-                    shard_model_param, model_param)
-                if hasattr(model_param, 'shared'):
+                    shard_model_param, model_param
+                )
+                if hasattr(model_param, "shared"):
                     shard_model_param.shared = model_param.shared
 
             else:
-                raise TypeError('Wrapped parameters must be one of '
-                                'torch.musa.FloatTensor,  '
-                                'torch.musa.HalfTensor, or '
-                                'torch.musa.BFloat16Tensor. '
-                                'Received {}'.format(model_param.type()))
+                raise TypeError(
+                    "Wrapped parameters must be one of "
+                    "torch.musa.FloatTensor,  "
+                    "torch.musa.HalfTensor, or "
+                    "torch.musa.BFloat16Tensor. "
+                    "Received {}".format(model_param.type())
+                )
 
         # Update optimizer's params.
         group_range["orig_group"]["params"] = [
@@ -111,5 +119,9 @@ def build_model_and_main_param_groups(cls,
     )
 
 
-megatron.optimizer.distrib_optimizer.DistributedOptimizer.build_model_and_main_param_groups = build_model_and_main_param_groups
-megatron.optimizer.DistributedOptimizer.build_model_and_main_param_groups = build_model_and_main_param_groups
+megatron.optimizer.distrib_optimizer.DistributedOptimizer.build_model_and_main_param_groups = (
+    build_model_and_main_param_groups
+)
+megatron.optimizer.DistributedOptimizer.build_model_and_main_param_groups = (
+    build_model_and_main_param_groups
+)

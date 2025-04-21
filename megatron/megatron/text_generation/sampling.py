@@ -14,8 +14,7 @@ def modify_logits_for_top_k_filtering(logits, top_k):
     """Set the logits for none top-k values to -inf."""
 
     filter_ = logits < torch.topk(logits, top_k)[0][..., -1, None]
-    logits.masked_fill_(filter_, float('-Inf'))
-
+    logits.masked_fill_(filter_, float("-Inf"))
 
 
 def modify_logits_for_top_p_filtering(logits, top_p):
@@ -37,11 +36,11 @@ def modify_logits_for_top_p_filtering(logits, top_p):
 
     # Fill in the filtered part
     filter_ = filter_.scatter(1, sorted_indices, filter_)
-    logits.masked_fill_(filter_, float('-Inf'))
+    logits.masked_fill_(filter_, float("-Inf"))
 
-def sample(logits, top_k=0, top_p=0.0, temperature=1.0, vocab_size=None,
-           seed=123):
-    """ Sample and generate a token.
+
+def sample(logits, top_k=0, top_p=0.0, temperature=1.0, vocab_size=None, seed=123):
+    """Sample and generate a token.
     Note: logits has the dimension [b, v] where b is the batch size
           and v is the vocabulary size.
     If vocab_size is provided, we will make sure the sample that is
@@ -52,10 +51,8 @@ def sample(logits, top_k=0, top_p=0.0, temperature=1.0, vocab_size=None,
     generator = torch.Generator(device=logits.device)
     generator.manual_seed(seed)
     # Check logits for consistency.
-    assert logits.ndim == 2, 'expected the logits to be of [b, v] shape.'
-    assert logits.type() == 'torch.cuda.FloatTensor', \
-        'input logits should be floats.'
-
+    assert logits.ndim == 2, "expected the logits to be of [b, v] shape."
+    assert logits.type() == "torch.cuda.FloatTensor", "input logits should be floats."
 
     # Greedy is just simple argmax.
     if top_k == 1:
@@ -68,13 +65,13 @@ def sample(logits, top_k=0, top_p=0.0, temperature=1.0, vocab_size=None,
         logits = logits.clone()
         # Apply temperature in place.
         if top_p > 0.0:
-            assert top_p <= 1.0, 'top-p should be in (0, 1].'
+            assert top_p <= 1.0, "top-p should be in (0, 1]."
             modify_logits_for_top_p_filtering(logits, top_p)
 
         if top_k > 1:
-            assert top_k <= logits.size(1), 'top-k is larger than logit size.'
+            assert top_k <= logits.size(1), "top-k is larger than logit size."
             if vocab_size:
-                assert top_k < vocab_size, 'top-k is larger than vocab size.'
+                assert top_k < vocab_size, "top-k is larger than vocab size."
             modify_logits_for_top_k_filtering(logits, top_k)
 
         if temperature != 1.0:
@@ -90,8 +87,9 @@ def sample(logits, top_k=0, top_p=0.0, temperature=1.0, vocab_size=None,
 
     return samples
 
+
 def sample_single_thread(logits, top_k=0, top_p=0.0, temperature=1.0, vocab_size=None):
-    """ Sample and generate a token.
+    """Sample and generate a token.
     Note: logits has the dimension [b, v] where b is the batch size
           and v is the vocabulary size.
     If vocab_size is provided, we will make sure the sample that is
@@ -100,10 +98,11 @@ def sample_single_thread(logits, top_k=0, top_p=0.0, temperature=1.0, vocab_size
     """
 
     # Check logits for consistency.
-    assert logits.ndim == 2, 'expected the logits to be of [b, v] shape.'
-    assert logits.type() in ['torch.cuda.FloatTensor', 'torch.xpu.FloatTensor'], \
-        'input logits should be floats.'
-
+    assert logits.ndim == 2, "expected the logits to be of [b, v] shape."
+    assert logits.type() in [
+        "torch.cuda.FloatTensor",
+        "torch.xpu.FloatTensor",
+    ], "input logits should be floats."
 
     # Greedy is just simple argmax.
     if top_k == 1:
@@ -116,13 +115,13 @@ def sample_single_thread(logits, top_k=0, top_p=0.0, temperature=1.0, vocab_size
         logits = logits.clone()
         # Apply temperature in place.
         if top_p > 0.0:
-            assert top_p <= 1.0, 'top-p should be in (0, 1].'
+            assert top_p <= 1.0, "top-p should be in (0, 1]."
             modify_logits_for_top_p_filtering(logits, top_p)
 
         if top_k > 1:
-            assert top_k <= logits.size(1), 'top-k is larger than logit size.'
+            assert top_k <= logits.size(1), "top-k is larger than logit size."
             if vocab_size:
-                assert top_k < vocab_size, 'top-k is larger than vocab size.'
+                assert top_k < vocab_size, "top-k is larger than vocab size."
             modify_logits_for_top_k_filtering(logits, top_k)
 
         if temperature != 1.0:
@@ -130,7 +129,9 @@ def sample_single_thread(logits, top_k=0, top_p=0.0, temperature=1.0, vocab_size
 
         # After filtering, we need to recalculate the distribution.
         probs = logits.softmax(dim=-1)
-        samples = torch.multinomial(probs.to('cpu'), num_samples=1).view(-1).to(probs.device)
+        samples = (
+            torch.multinomial(probs.to("cpu"), num_samples=1).view(-1).to(probs.device)
+        )
         # samples = torch.multinomial(probs, num_samples=1).view(-1)
 
     # If vocab size is provided, make sure the samples are in
@@ -139,6 +140,7 @@ def sample_single_thread(logits, top_k=0, top_p=0.0, temperature=1.0, vocab_size
         samples = torch.clamp(samples, min=0, max=(vocab_size - 1))
 
     return samples
+
 
 # def sample(logits, top_k=0, top_p=0.0, temperature=1.0, vocab_size=None):
 #     """ Sample and generate a token.

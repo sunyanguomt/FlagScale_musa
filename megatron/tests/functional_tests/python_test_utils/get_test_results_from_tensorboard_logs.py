@@ -1,5 +1,6 @@
 import os
-os.environ['OPENBLAS_NUM_THREADS'] = '1'
+
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
 import sys
 import glob
 from tensorboard.backend.event_processing import event_accumulator
@@ -24,10 +25,11 @@ def read_tb_logs_as_list(path, summary_name):
         ea.Reload()
         summary = ea.Scalars(summary_name)
         summary_list = [round(x.value, 5) for x in summary]
-        print(f'\nObtained the following list for {summary_name} ------------------')
+        print(f"\nObtained the following list for {summary_name} ------------------")
         print(summary_list)
         return summary_list
-    raise FileNotFoundError(f"File not found matching: {path}/events*")    
+    raise FileNotFoundError(f"File not found matching: {path}/events*")
+
 
 def collect_train_test_metrics(logs_dir, run_name):
     # TODO: Fetch current baseline
@@ -41,32 +43,31 @@ def collect_train_test_metrics(logs_dir, run_name):
     iteration_time = read_tb_logs_as_list(logs_dir, "iteration-time")
 
     # First few iterations might take a little longer. So we take the last 70 percent of the timings
-    idx = len(iteration_time)//3   
-    iteration_time_avg = sum(iteration_time[idx:])/len(iteration_time[idx:])
+    idx = len(iteration_time) // 3
+    iteration_time_avg = sum(iteration_time[idx:]) / len(iteration_time[idx:])
 
     train_metrics = {
         "lm loss": {
             "start_step": 0,
             "end_step": len(train_loss_list),
             "step_interval": 5,
-            "values": train_loss_list[0:len(train_loss_list):5],
+            "values": train_loss_list[0 : len(train_loss_list) : 5],
         },
         "num-zeros": {
             "start_step": 0,
             "end_step": len(num_zeros),
             "step_interval": 5,
-            "values": num_zeros[0:len(num_zeros):5],
+            "values": num_zeros[0 : len(num_zeros) : 5],
         },
         "iteration_timing_avg": iteration_time_avg,
     }
-    str_train_metrics = str(train_metrics).replace("'", "\"")
+    str_train_metrics = str(train_metrics).replace("'", '"')
     print(f"\n ----------- Store the following metrics in {run_name}.json ----------")
     print(f"\n {str_train_metrics}", flush=True)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     args = sys.argv[1:]
-    logs_dir = args[0] # eg /lustre/fsw/joc/shanmugamr/megatron/logs/
+    logs_dir = args[0]  # eg /lustre/fsw/joc/shanmugamr/megatron/logs/
     run_name = args[1]
     collect_train_test_metrics(logs_dir, run_name)
-
-

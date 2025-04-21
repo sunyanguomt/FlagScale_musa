@@ -4,16 +4,16 @@ from .indexes import FaissBaseIndex, FaissParallelAddIndex
 
 
 class IndexFactory:
-    '''Get index.
+    """Get index.
 
     Index type generally read from argument '--retro-index-ty'.
-    '''
+    """
 
     @classmethod
     def get_index_class(cls, index_type):
         return {
-            "faiss-base" : FaissBaseIndex,
-            "faiss-par-add" : FaissParallelAddIndex,
+            "faiss-base": FaissBaseIndex,
+            "faiss-par-add": FaissParallelAddIndex,
         }[index_type]
 
     @classmethod

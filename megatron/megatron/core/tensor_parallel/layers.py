@@ -41,16 +41,16 @@ except ImportError:
 
 
 _MODEL_PARALLEL_ATTRIBUTE_DEFAULTS = {
-    'tensor_model_parallel': False,
-    'partition_dim': -1,
-    'partition_stride': 1,
+    "tensor_model_parallel": False,
+    "partition_dim": -1,
+    "partition_stride": 1,
 }
 
 
 def param_is_not_tensor_parallel_duplicate(param):
-    return (hasattr(param, 'tensor_model_parallel') and param.tensor_model_parallel) or (
-        get_tensor_model_parallel_rank() == 0
-    )
+    return (
+        hasattr(param, "tensor_model_parallel") and param.tensor_model_parallel
+    ) or (get_tensor_model_parallel_rank() == 0)
 
 
 def set_tensor_model_parallel_attributes(tensor, is_parallel, dim, stride):
@@ -58,9 +58,9 @@ def set_tensor_model_parallel_attributes(tensor, is_parallel, dim, stride):
     for attribute in _MODEL_PARALLEL_ATTRIBUTE_DEFAULTS:
         assert not hasattr(tensor, attribute)
     # Set the attributes.
-    setattr(tensor, 'tensor_model_parallel', is_parallel)
-    setattr(tensor, 'partition_dim', dim)
-    setattr(tensor, 'partition_stride', stride)
+    setattr(tensor, "tensor_model_parallel", is_parallel)
+    setattr(tensor, "partition_dim", dim)
+    setattr(tensor, "partition_stride", stride)
 
 
 def set_defaults_if_not_set_tensor_model_parallel_attributes(tensor):
@@ -114,13 +114,17 @@ def _initialize_affine_weight_cpu(
     )
 
     # Initialize master weight
-    master_weight = torch.empty(output_size, input_size, dtype=torch.float, requires_grad=False)
+    master_weight = torch.empty(
+        output_size, input_size, dtype=torch.float, requires_grad=False
+    )
     init_method(master_weight)
     master_weight = master_weight.to(dtype=params_dtype)
 
     # Split and copy
     per_partition_per_stride_size = divide(per_partition_size, stride)
-    weight_list = torch.split(master_weight, per_partition_per_stride_size, dim=partition_dim)
+    weight_list = torch.split(
+        master_weight, per_partition_per_stride_size, dim=partition_dim
+    )
     rank = get_tensor_model_parallel_rank()
     world_size = get_tensor_model_parallel_world_size()
     my_weight_list = weight_list[rank::world_size]
@@ -170,15 +174,21 @@ class VocabParallelEmbedding(torch.nn.Module):
             self.vocab_start_index,
             self.vocab_end_index,
         ) = VocabUtility.vocab_range_from_global_vocab_size(
-            self.num_embeddings, get_tensor_model_parallel_rank(), self.tensor_model_parallel_size
+            self.num_embeddings,
+            get_tensor_model_parallel_rank(),
+            self.tensor_model_parallel_size,
         )
-        self.num_embeddings_per_partition = self.vocab_end_index - self.vocab_start_index
+        self.num_embeddings_per_partition = (
+            self.vocab_end_index - self.vocab_start_index
+        )
 
         # Allocate weights and initialize.
         if config.use_cpu_initialization:
             self.weight = Parameter(
                 torch.empty(
-                    self.num_embeddings_per_partition, self.embedding_dim, dtype=config.params_dtype
+                    self.num_embeddings_per_partition,
+                    self.embedding_dim,
+                    dtype=config.params_dtype,
                 )
             )
             if config.perform_initialization:
@@ -201,12 +211,16 @@ class VocabParallelEmbedding(torch.nn.Module):
                 )
             )
             if config.perform_initialization:
-                _initialize_affine_weight_gpu(self.weight, init_method, partition_dim=0, stride=1)
+                _initialize_affine_weight_gpu(
+                    self.weight, init_method, partition_dim=0, stride=1
+                )
 
     def forward(self, input_):
         if self.tensor_model_parallel_size > 1:
             # Build the mask.
-            input_mask = (input_ < self.vocab_start_index) | (input_ >= self.vocab_end_index)
+            input_mask = (input_ < self.vocab_start_index) | (
+                input_ >= self.vocab_end_index
+            )
             # Mask the input.
             masked_input = input_.clone() - self.vocab_start_index
             masked_input[input_mask] = 0
@@ -232,17 +246,20 @@ class VocabParallelEmbedding(torch.nn.Module):
 
 class LinearWithFrozenWeight(torch.autograd.Function):
     """Linear operator that does not calculate gradient for weight.
-    This op and LinearWithGradAccumulationAndAsyncCommunication performs 
-    mathematically-identical forward and DGRAD. 
-    
+    This op and LinearWithGradAccumulationAndAsyncCommunication performs
+    mathematically-identical forward and DGRAD.
+
     Conceptually this op is the same as torch.nn.functional.linear with
-    weight.requires_grad==False, but in experiments they are not identical 
-    mathematically. """
+    weight.requires_grad==False, but in experiments they are not identical
+    mathematically."""
 
     @staticmethod
     @custom_fwd
     def forward(
-        ctx, input, weight, bias,
+        ctx,
+        input,
+        weight,
+        bias,
     ):
         ctx.save_for_backward(weight)
         output = torch.matmul(input, weight.t())
@@ -268,10 +285,10 @@ def linear_with_frozen_weight(
 ) -> torch.Tensor:
     """Linear layer execution with weight.requires_grad == False.
 
-    This function handles linear layers with weight frozen (untrainable). 
+    This function handles linear layers with weight frozen (untrainable).
     In the forward, it only saves weight and does not save input activations.
-    In the backward, it does not perform weight gradient calculation, or 
-    weight gradient allreduce. 
+    In the backward, it does not perform weight gradient calculation, or
+    weight gradient allreduce.
 
     Arguments:
 
@@ -281,10 +298,10 @@ def linear_with_frozen_weight(
 
     bias (torch.Tensor optional): bias like torch.nn.functional.linear
 
-    gradient_accumulation_fusion (bool required): dummy argument, used to 
+    gradient_accumulation_fusion (bool required): dummy argument, used to
     keep the API unified between all forward implementation functions.
 
-    async_grad_allreduce (bool required): dummy argument, used to 
+    async_grad_allreduce (bool required): dummy argument, used to
     keep the API unified between all forward implementation functions.
 
     sequence_parallel (bool required): Indicates that sequence
@@ -293,7 +310,9 @@ def linear_with_frozen_weight(
         reduce scattered.
     """
     if sequence_parallel:
-        input = gather_from_sequence_parallel_region(input, tensor_parallel_output_grad=True)
+        input = gather_from_sequence_parallel_region(
+            input, tensor_parallel_output_grad=True
+        )
     else:
         input = input
 
@@ -331,12 +350,12 @@ class LinearWithGradAccumulationAndAsyncCommunication(torch.autograd.Function):
             dim_size = list(input.size())
             dim_size[0] = dim_size[0] * world_size
 
-            all_gather_buffer = \
-                get_global_memory_buffer().get_tensor(dim_size, input.dtype, "mpu")
+            all_gather_buffer = get_global_memory_buffer().get_tensor(
+                dim_size, input.dtype, "mpu"
+            )
             torch.distributed._all_gather_base(
-                all_gather_buffer,
-                input,
-                group=get_tensor_model_parallel_group())
+                all_gather_buffer, input, group=get_tensor_model_parallel_group()
+            )
             total_input = all_gather_buffer
         else:
             total_input = input
@@ -357,9 +376,14 @@ class LinearWithGradAccumulationAndAsyncCommunication(torch.autograd.Function):
             dim_size = list(input.size())
             dim_size[0] = dim_size[0] * world_size
 
-            all_gather_buffer = get_global_memory_buffer().get_tensor(dim_size, input.dtype, "mpu")
+            all_gather_buffer = get_global_memory_buffer().get_tensor(
+                dim_size, input.dtype, "mpu"
+            )
             handle = torch.distributed._all_gather_base(
-                all_gather_buffer, input, group=get_tensor_model_parallel_group(), async_op=True
+                all_gather_buffer,
+                input,
+                group=get_tensor_model_parallel_group(),
+                async_op=True,
             )
 
             # Here we rely on CUDA_DEVICE_MAX_CONNECTIONS=1 to ensure that the
@@ -382,6 +406,7 @@ class LinearWithGradAccumulationAndAsyncCommunication(torch.autograd.Function):
         grad_output = grad_output.view(
             grad_output.shape[0] * grad_output.shape[1], grad_output.shape[2]
         )
+        total_input = total_input.contiguous()
         total_input = total_input.view(
             total_input.shape[0] * total_input.shape[1], total_input.shape[2]
         )
@@ -398,11 +423,17 @@ class LinearWithGradAccumulationAndAsyncCommunication(torch.autograd.Function):
             assert not ctx.async_grad_allreduce
             dim_size = list(input.size())
             sub_grad_input = torch.empty(
-                dim_size, dtype=input.dtype, device=torch.cuda.current_device(), requires_grad=False
+                dim_size,
+                dtype=input.dtype,
+                device=torch.cuda.current_device(),
+                requires_grad=False,
             )
             # reduce_scatter
             handle = torch.distributed._reduce_scatter_base(
-                sub_grad_input, grad_input, group=get_tensor_model_parallel_group(), async_op=True
+                sub_grad_input,
+                grad_input,
+                group=get_tensor_model_parallel_group(),
+                async_op=True,
             )
             # Here we rely on CUDA_DEVICE_MAX_CONNECTIONS=1 to ensure that the
             # reduce scatter is scheduled before the weight gradient computation
@@ -417,7 +448,9 @@ class LinearWithGradAccumulationAndAsyncCommunication(torch.autograd.Function):
                     total_input, grad_output, weight.main_grad
                 )
             else:
-                raise RuntimeError("Unsupported gradient type for gradient accumulation fusion")
+                raise RuntimeError(
+                    "Unsupported gradient type for gradient accumulation fusion"
+                )
             grad_weight = None
         else:
             grad_weight = grad_output.t().matmul(total_input)
@@ -504,7 +537,7 @@ def linear_with_grad_accumulation_and_async_allreduce(
     ]
 
     if not linear_with_grad_accumulation_and_async_allreduce.warned:
-        if os.environ.get('CUDA_DEVICE_MAX_CONNECTIONS') != "1":
+        if os.environ.get("CUDA_DEVICE_MAX_CONNECTIONS") != "1":
             if sequence_parallel:
                 warnings.warn(
                     "When using sequence parallelism it is recommended to set the "
@@ -596,7 +629,9 @@ class ColumnParallelLinear(torch.nn.Module):
             if config.use_cpu_initialization:
                 self.weight = Parameter(
                     torch.empty(
-                        self.output_size_per_partition, self.input_size, dtype=config.params_dtype
+                        self.output_size_per_partition,
+                        self.input_size,
+                        dtype=config.params_dtype,
                     )
                 )
                 if config.perform_initialization:
@@ -629,7 +664,9 @@ class ColumnParallelLinear(torch.nn.Module):
         if bias:
             if config.use_cpu_initialization:
                 self.bias = Parameter(
-                    torch.empty(self.output_size_per_partition, dtype=config.params_dtype)
+                    torch.empty(
+                        self.output_size_per_partition, dtype=config.params_dtype
+                    )
                 )
             else:
                 self.bias = Parameter(
@@ -645,7 +682,7 @@ class ColumnParallelLinear(torch.nn.Module):
                 with torch.no_grad():
                     self.bias.zero_()
         else:
-            self.register_parameter('bias', None)
+            self.register_parameter("bias", None)
 
         self.async_tensor_model_parallel_allreduce = (
             config.async_tensor_model_parallel_allreduce and world_size > 1
@@ -665,7 +702,7 @@ class ColumnParallelLinear(torch.nn.Module):
                 "to True but the custom CUDA extension fused_weight_gradient_mlp_cuda "
                 "module is not found. To use gradient_accumulation_fusion you must "
                 "install APEX with --cpp_ext and --cuda_ext. For example: "
-                "pip install --global-option=\"--cpp_ext\" --global-option=\"--cuda_ext .\" "
+                'pip install --global-option="--cpp_ext" --global-option="--cuda_ext ." '
                 "Note that the extension requires CUDA>=11. Otherwise, you must turn off "
                 "gradient accumulation fusion."
             )
@@ -739,7 +776,7 @@ class ColumnParallelLinear(torch.nn.Module):
 
 
 class MuReadoutColumnParallelLinear(ColumnParallelLinear):
-    '''Drop-in replacement for column parallel linear layers.
+    """Drop-in replacement for column parallel linear layers.
 
     This class is implemented based on MuReadout
     (https://github.com/microsoft/mup/blob/main/mup/layer.py#L5) .
@@ -749,7 +786,8 @@ class MuReadoutColumnParallelLinear(ColumnParallelLinear):
 
     This layer implements the version of μP with a 1/width multiplier and a
     constant variance initialization for both weights and biases.
-    '''
+    """
+
     def __init__(self, *args, readout_zero_init=False, output_mult=1.0, **kwargs):
         self.output_mult = output_mult
         self.readout_zero_init = readout_zero_init
@@ -761,35 +799,35 @@ class MuReadoutColumnParallelLinear(ColumnParallelLinear):
                 self.bias.data.zero_()
 
     def width_mult(self):
-        assert hasattr(self.weight, 'infshape'), (
-            'Please call set_base_shapes(...). If using torch.nn.DataParallel, '
-            'switch to distributed training with '
-            'torch.nn.parallel.DistributedDataParallel instead'
+        assert hasattr(self.weight, "infshape"), (
+            "Please call set_base_shapes(...). If using torch.nn.DataParallel, "
+            "switch to distributed training with "
+            "torch.nn.parallel.DistributedDataParallel instead"
         )
         return self.weight.infshape.width_mult()
 
     def _rescale_parameters(self):
-        '''Rescale parameters to convert SP initialization to μP initialization.
+        """Rescale parameters to convert SP initialization to μP initialization.
 
         Warning: This method is NOT idempotent and should be called only once
         unless you know what you are doing.
-        '''
-        if hasattr(self, '_has_rescaled_params') and self._has_rescaled_params:
+        """
+        if hasattr(self, "_has_rescaled_params") and self._has_rescaled_params:
             raise RuntimeError(
                 "`_rescale_parameters` has been called once before already. "
                 "Unless you know what you are doing, usually you should not be calling `_rescale_parameters` more than once.\n"
                 "If you called `set_base_shapes` on a model loaded from a checkpoint, "
                 "or just want to re-set the base shapes of an existing model, "
                 "make sure to set the flag `rescale_params=False`.\n"
-                "To bypass this error and *still rescale parameters*, set `self._has_rescaled_params=False` before this call.")
+                "To bypass this error and *still rescale parameters*, set `self._has_rescaled_params=False` before this call."
+            )
         if self.bias is not None:
-            self.bias.data *= self.width_mult()**0.5
-        self.weight.data *= self.width_mult()**0.5
+            self.bias.data *= self.width_mult() ** 0.5
+        self.weight.data *= self.width_mult() ** 0.5
         self._has_rescaled_params = True
-                    
+
     def forward(self, x):
-        return super().forward(
-            self.output_mult * x / self.width_mult())
+        return super().forward(self.output_mult * x / self.width_mult())
 
 
 class RowParallelLinear(torch.nn.Module):
@@ -854,7 +892,9 @@ class RowParallelLinear(torch.nn.Module):
         self.gradient_accumulation_fusion = config.gradient_accumulation_fusion
         self.sequence_parallel = config.sequence_parallel
         if self.sequence_parallel and not self.input_is_parallel:
-            raise RuntimeError("To enable `sequence_parallel`, `input_is_parallel` must be `True`")
+            raise RuntimeError(
+                "To enable `sequence_parallel`, `input_is_parallel` must be `True`"
+            )
 
         # Parameters.
         # Note: torch.nn.functional.linear performs XA^T + b and as a result
@@ -863,7 +903,9 @@ class RowParallelLinear(torch.nn.Module):
         if config.use_cpu_initialization:
             self.weight = Parameter(
                 torch.empty(
-                    self.output_size, self.input_size_per_partition, dtype=config.params_dtype
+                    self.output_size,
+                    self.input_size_per_partition,
+                    dtype=config.params_dtype,
                 )
             )
             if config.perform_initialization:
@@ -893,7 +935,9 @@ class RowParallelLinear(torch.nn.Module):
                 )
         if bias:
             if config.use_cpu_initialization:
-                self.bias = Parameter(torch.empty(self.output_size, dtype=config.params_dtype))
+                self.bias = Parameter(
+                    torch.empty(self.output_size, dtype=config.params_dtype)
+                )
             else:
                 self.bias = Parameter(
                     torch.empty(
@@ -902,14 +946,14 @@ class RowParallelLinear(torch.nn.Module):
                         dtype=config.params_dtype,
                     )
                 )
-            setattr(self.bias, 'sequence_parallel', self.sequence_parallel)
+            setattr(self.bias, "sequence_parallel", self.sequence_parallel)
 
             if config.perform_initialization:
                 # Always initialize bias to zero.
                 with torch.no_grad():
                     self.bias.zero_()
         else:
-            self.register_parameter('bias', None)
+            self.register_parameter("bias", None)
 
         self._forward_impl = linear_with_grad_accumulation_and_async_allreduce
 

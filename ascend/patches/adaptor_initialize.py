@@ -26,13 +26,14 @@ def set_jit_fusion_options():
     # initial mc2
     args = get_args()
     if args.use_npu_mc2:
-        from .ascend_turbo.initialize import initialize_cfg_from_args    
+        from .ascend_turbo.initialize import initialize_cfg_from_args
+
         initialize_cfg_from_args(args)
-    
+
     """Set PyTorch JIT layer fusion options."""
     # flags required to enable jit fusion kernels
-    TORCH_MAJOR = int(torch.__version__.split('.')[0])
-    TORCH_MINOR = int(torch.__version__.split('.')[1])
+    TORCH_MAJOR = int(torch.__version__.split(".")[0])
+    TORCH_MINOR = int(torch.__version__.split(".")[1])
     if (TORCH_MAJOR > 1) or (TORCH_MAJOR == 1 and TORCH_MINOR >= 10):
         # nvfuser
         torch._C._jit_set_profiling_executor(True)
@@ -54,5 +55,5 @@ megatron.initialize._compile_dependencies = _compile_dependencies
 
 
 for k, v in sys.modules.items():
-    if 'megatron' in k and hasattr(v, 'set_jit_fusion_options'):
-        setattr(v, 'set_jit_fusion_options', set_jit_fusion_options)
+    if "megatron" in k and hasattr(v, "set_jit_fusion_options"):
+        setattr(v, "set_jit_fusion_options", set_jit_fusion_options)

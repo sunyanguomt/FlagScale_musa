@@ -1,0 +1,1 @@
+bash -c 'cd /home/dist/FlagScale/aquila; bash ./7B/pretrain_llama_7b_distribute.sh /home/dist/FlagScale/aquila tp2_pp2_dp2_mbs2_numbs256_gbs1024_gpus8 ./hostfile "/home/dist/RedPajama/" 2 2 8 2 1024 > ./output/2024-10-12_11:48:15/tp2_pp2_dp2_mbs2_numbs256_gbs1024_gpus8.log.0.10.74.24.52 2>&1 &'

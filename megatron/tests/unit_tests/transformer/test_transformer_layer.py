@@ -12,13 +12,17 @@ from megatron.core.tensor_parallel.random import model_parallel_cuda_manual_seed
 from megatron.core.transformer.transformer_config import TransformerConfig
 
 
-
 class TestParallelTransformerLayer:
-    
+
     def setup_method(self, method):
-        Utils.initialize_model_parallel(1,1)
+        Utils.initialize_model_parallel(1, 1)
         model_parallel_cuda_manual_seed(123)
-        transformer_config = TransformerConfig(num_layers=2, hidden_size=12, num_attention_heads=4, use_cpu_initialization=True)
+        transformer_config = TransformerConfig(
+            num_layers=2,
+            hidden_size=12,
+            num_attention_heads=4,
+            use_cpu_initialization=True,
+        )
         self.parallel_transformer_layer = TransformerLayer(transformer_config)
 
     def teardown_method(self, method):
@@ -40,12 +44,18 @@ class TestParallelTransformerLayer:
         parallel_transformer_layer.cuda()
 
         # [sequence length, batch size, hidden size]
-        hidden_states = torch.ones((sequence_length, micro_batch_size, config.hidden_size))
+        hidden_states = torch.ones(
+            (sequence_length, micro_batch_size, config.hidden_size)
+        )
         hidden_states = hidden_states.cuda()
 
-        attention_mask = torch.ones((1, 1, sequence_length, sequence_length), dtype=bool).cuda()
+        attention_mask = torch.ones(
+            (1, 1, sequence_length, sequence_length), dtype=bool
+        ).cuda()
 
-        hidden_states = parallel_transformer_layer(hidden_states=hidden_states, attention_mask=attention_mask)
+        hidden_states = parallel_transformer_layer(
+            hidden_states=hidden_states, attention_mask=attention_mask
+        )
         assert hidden_states.shape[0] == sequence_length
         assert hidden_states.shape[1] == micro_batch_size
         assert hidden_states.shape[2] == config.hidden_size

@@ -5,6 +5,7 @@ import megatron
 from megatron import get_args
 from megatron import fused_kernels
 
+
 def _compile_dependencies():
 
     args = get_args()
@@ -76,6 +77,7 @@ def _compile_dependencies():
             "Compilation time: {:.3f} seconds".format(time.time() - start_time),
             flush=True,
         )
+
 
 print("=== Monkey-patching initialize.py ===")
 megatron.initialize._compile_dependencies = _compile_dependencies

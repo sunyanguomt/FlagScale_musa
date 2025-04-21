@@ -3,7 +3,7 @@ from megatron import print_rank_0
 
 
 def print_device_type():
-    device_type = "apu_demo" 
+    device_type = "apu_demo"
     if device_type:
         print_rank_0("=== Monkey-patching Device Type: {} ===".format(device_type))
     else:

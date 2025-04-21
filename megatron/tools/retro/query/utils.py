@@ -12,6 +12,6 @@ def get_query_workdir():
 
 
 def get_neighbor_dirname(key, dataset):
-    hashes = ",".join([ d.desc_hash for d in dataset.datasets ])
+    hashes = ",".join([d.desc_hash for d in dataset.datasets])
     hash = hashlib.md5(hashes.encode()).hexdigest()
     return os.path.join(get_query_workdir(), os.path.basename(f"{key}_{hash}"))

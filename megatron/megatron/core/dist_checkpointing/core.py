@@ -5,7 +5,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Optional
 
-CONFIG_FNAME = 'metadata.json'
+CONFIG_FNAME = "metadata.json"
 
 
 class CheckpointingException(Exception):
@@ -14,11 +14,11 @@ class CheckpointingException(Exception):
 
 @dataclass
 class CheckpointingConfig:
-    """ Documents backends used in the checkpoint. """
+    """Documents backends used in the checkpoint."""
 
     sharded_backend: str
     sharded_backend_version: int = 1
-    common_backend: str = 'torch'
+    common_backend: str = "torch"
     common_backend_version: int = 1
 
 
@@ -37,5 +37,5 @@ def maybe_load_config(checkpoint_dir: str) -> Optional[CheckpointingConfig]:
 
 def save_config(config: CheckpointingConfig, checkpoint_dir: str):
     config_path = Path(checkpoint_dir, CONFIG_FNAME)
-    with config_path.open('w') as f:
+    with config_path.open("w") as f:
         json.dump(asdict(config), f)

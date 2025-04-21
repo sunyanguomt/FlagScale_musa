@@ -8,13 +8,13 @@ from .external_libs import transformers
 
 
 class IterableTextDataset(torch.utils.data.IterableDataset):
-    '''Iterable over a text dataset.'''
+    """Iterable over a text dataset."""
 
     def __init__(self, text_dataset):
         self.text_dataset = text_dataset
 
     def __iter__(self):
-        '''Remove 'endoftext' string.'''
+        """Remove 'endoftext' string."""
         for sample_idx in range(len(self.text_dataset)):
             sample = self.text_dataset[sample_idx]
             text = sample["text"].replace("<|endoftext|>", "")
@@ -29,12 +29,12 @@ class MyFeatureExtractionPipeline(transformers.FeatureExtractionPipeline):
 
         # Attention mask.
         embeddings = model_outputs[0]
-        masks = torch.sum(model_inputs['attention_mask'], dim=1)
+        masks = torch.sum(model_inputs["attention_mask"], dim=1)
 
         # Collect embeddings & check for nan.
         outputs = []
         for embedding, mask in zip(embeddings, masks):
-            output = torch.mean(embedding[1: mask - 1], dim=0)
+            output = torch.mean(embedding[1 : mask - 1], dim=0)
 
             # Nans due to empty input sequences; so only check first element.
             if torch.isnan(output.view(-1)[0]).any():
@@ -44,8 +44,8 @@ class MyFeatureExtractionPipeline(transformers.FeatureExtractionPipeline):
 
         # Sample.
         data = {
-            "input" : model_inputs["input_ids"],
-            "output" : outputs,
+            "input": model_inputs["input_ids"],
+            "output": outputs,
         }
 
         return data
@@ -53,8 +53,8 @@ class MyFeatureExtractionPipeline(transformers.FeatureExtractionPipeline):
     def postprocess(self, model_outputs):
         # Return input for analysis.
         return {
-            "input" : model_outputs["input"].numpy(),
-            "output" : model_outputs["output"].numpy(),
+            "input": model_outputs["input"].numpy(),
+            "output": model_outputs["output"].numpy(),
         }
 
 
@@ -65,7 +65,8 @@ class HuggingfaceEmbedder:
         # Model, tokenizer.
         self.model = transformers.BertModel.from_pretrained("bert-large-cased")
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(
-            "bert-large-cased", model_max_length=max_seq_length)
+            "bert-large-cased", model_max_length=max_seq_length
+        )
 
         # Feature extraction pipeline.
         self.pipe = MyFeatureExtractionPipeline(
@@ -103,19 +104,22 @@ class HuggingfaceEmbedder:
         return embeddings
 
     def embed_text(self, text):
-        '''Embed a single text string.
+        """Embed a single text string.
 
         Primarily used for on-the-fly embeddings, particularly during
         analysis or debugging. For large scale, use 'embed_text_dataset()'.
-        '''
+        """
 
         class SingleTextDataset(torch.utils.data.Dataset):
-            '''Dataset that holds single string.'''
+            """Dataset that holds single string."""
+
             def __init__(self, text):
                 assert isinstance(text, str)
                 self.text = text
+
             def __len__(self):
                 return 1
+
             def __getitem__(self, i):
                 return {"text": self.text}
 

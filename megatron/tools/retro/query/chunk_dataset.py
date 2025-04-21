@@ -4,8 +4,9 @@ import os
 import torch
 
 from megatron import get_retro_args, print_rank_0
-from megatron.data.gpt_dataset import build_train_valid_test_datasets \
-    as build_gpt_train_valid_test_datasets
+from megatron.data.gpt_dataset import (
+    build_train_valid_test_datasets as build_gpt_train_valid_test_datasets,
+)
 from megatron.training import (
     build_train_valid_test_datasets as build_pretraining_train_valid_test_datasets,
     update_train_iters,
@@ -17,12 +18,12 @@ from .utils import get_neighbor_dirname, get_query_workdir
 
 
 class ChunkDataset(torch.utils.data.Dataset):
-    '''Pretraining chunk dataset wraps a standard GPT dataset.
+    """Pretraining chunk dataset wraps a standard GPT dataset.
 
     This dataset conceptually divides each sample (e.g., length 2048)
     into chunks (e.g., length 64) and restructures them into a list of
     chunks (e.g., length num_samples * num_chunks_per_sample).
-    '''
+    """
 
     def __init__(self, sample_dataset, chunk_length):
 
@@ -56,19 +57,19 @@ class ChunkDataset(torch.utils.data.Dataset):
 
         # Sample.
         return {
-            "doc_ids" : sample_doc_ids,
-            "text" : chunk_token_ids,
+            "doc_ids": sample_doc_ids,
+            "text": chunk_token_ids,
         }
 
 
 def verify_indexed_dataset_order():
-    '''Verify pretraining order same as DB order.'''
+    """Verify pretraining order same as DB order."""
 
     args = get_retro_args()
 
     # DB dataset prefixes.
     db_indexed_dataset_infos = get_indexed_dataset_infos()
-    db_prefixes = [ info["prefix"] for info in db_indexed_dataset_infos ]
+    db_prefixes = [info["prefix"] for info in db_indexed_dataset_infos]
 
     # Verify order & prefixes.
     assert len(args.data_path) >= 2, "blendable dataset supported only."
@@ -85,8 +86,7 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
 
     args = get_retro_args()
 
-    print_rank_0('> building train, validation, and test datasets '
-                 'for GPT ...')
+    print_rank_0("> building train, validation, and test datasets " "for GPT ...")
     train_ds, valid_ds, test_ds = build_gpt_train_valid_test_datasets(
         data_prefix=args.retro_gpt_data_path,
         data_impl=args.retro_gpt_data_impl,
@@ -95,14 +95,15 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
         seq_length=args.retro_gpt_seq_length,
         seed=args.retro_gpt_seed,
         skip_warmup=(not args.retro_gpt_mmap_warmup),
-        return_doc_ids=args.retro_return_doc_ids)
+        return_doc_ids=args.retro_return_doc_ids,
+    )
     print_rank_0("> finished creating pretrained GPT datasets ...")
 
     return train_ds, valid_ds, test_ds
 
 
 def get_chunk_dataset_map():
-    '''Get train, valid, test chunk datasets.'''
+    """Get train, valid, test chunk datasets."""
 
     args = get_retro_args()
 
@@ -118,21 +119,23 @@ def get_chunk_dataset_map():
     # Datasets.
     print_rank_0(" > datasets.")
     train_ds, valid_ds, test_ds = build_pretraining_train_valid_test_datasets(
-        train_valid_test_datasets_provider)
+        train_valid_test_datasets_provider
+    )
 
     sample_dataset_map = {
-        "train" : train_ds,
-        "valid" : valid_ds,
-        "test" : test_ds,
+        "train": train_ds,
+        "valid": valid_ds,
+        "test": test_ds,
     }
 
     # Info dict.
     chunk_dataset_map = {
-        key : {
-            "neighbor_dir" : get_neighbor_dirname(key, sample_ds),
-            "data" : ChunkDataset(sample_ds, args.retro_gpt_chunk_length),
+        key: {
+            "neighbor_dir": get_neighbor_dirname(key, sample_ds),
+            "data": ChunkDataset(sample_ds, args.retro_gpt_chunk_length),
         }
-        for key, sample_ds in sample_dataset_map.items() if sample_ds
+        for key, sample_ds in sample_dataset_map.items()
+        if sample_ds
     }
 
     return chunk_dataset_map

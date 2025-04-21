@@ -35,8 +35,8 @@ def get_index_dir():
 
 
 def num_samples_to_block_ranges(num_samples):
-    '''Split a range (length num_samples) into sequence of block ranges
-    of size block_size.'''
+    """Split a range (length num_samples) into sequence of block ranges
+    of size block_size."""
     args = get_retro_args()
     block_size = args.retro_block_size
     start_idxs = list(range(0, num_samples, block_size))
@@ -60,8 +60,10 @@ def get_training_data_block_paths():
 
 def get_training_data_merged_path():
     args = get_retro_args()
-    return os.path.join(get_training_data_root_dir(),
-                        "train_%.3f.bin" % args.retro_index_train_load_fraction)
+    return os.path.join(
+        get_training_data_root_dir(),
+        "train_%.3f.bin" % args.retro_index_train_load_fraction,
+    )
 
 
 def get_added_codes_dir():

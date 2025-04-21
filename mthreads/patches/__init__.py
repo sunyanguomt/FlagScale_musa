@@ -12,7 +12,7 @@ from . import optimizer_distrib_optimizer
 from . import optimizer_grad_scaler
 from . import optimizer_optimizer
 
-torch.cuda.current_device = lambda : f'musa:{torch.musa.current_device()}'
+torch.cuda.current_device = lambda: f"musa:{torch.musa.current_device()}"
 torch.cuda.device_count = torch.musa.device_count
 torch.cuda.set_device = torch.musa.set_device
 torch.cuda.DoubleTensor = torch.musa.DoubleTensor

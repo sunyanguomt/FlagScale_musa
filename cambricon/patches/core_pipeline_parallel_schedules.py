@@ -6,6 +6,7 @@ import contextlib
 from megatron.core import parallel_state
 from megatron.core.enums import ModelType
 
+
 def forward_step(
     forward_step_func,
     data_iterator,
@@ -24,7 +25,7 @@ def forward_step(
 
     Returns output tensor."""
     if config.timers is not None:
-        config.timers('forward-compute', log_level=2).start()
+        config.timers("forward-compute", log_level=2).start()
 
     unwrap_output_tensor = False
     if not isinstance(input_tensor, list):
@@ -57,7 +58,7 @@ def forward_step(
             forward_data_store.append(data)
 
     if config.timers is not None:
-        config.timers('forward-compute').stop()
+        config.timers("forward-compute").stop()
 
     # If T5 model (or other model with encoder and decoder)
     # and in decoder stack, then send encoder_hidden_state
@@ -71,5 +72,6 @@ def forward_step(
     if unwrap_output_tensor:
         return output_tensor
     return [output_tensor]
+
 
 megatron.core.pipeline_parallel.schedules.forward_step = forward_step

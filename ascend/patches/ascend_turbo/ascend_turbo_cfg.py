@@ -1,4 +1,3 @@
-
 class AscendConfig:
     def __init__(self):
         self.ColumnParallelLinear = None
@@ -36,5 +35,6 @@ class AscendConfig:
     def parallel_linear_plugin(self, column_parallel_forward, row_parallel_forward):
         self.ColumnParallelLinear.forward = column_parallel_forward
         self.RowParallelLinear.forward = row_parallel_forward
+
 
 ascend_turbo_cfg = AscendConfig()

@@ -3,15 +3,17 @@ import torch
 import torch_mlu
 import megatron.optimizer
 from torch import inf
+
 try:
     from apex.multi_tensor_apply import multi_tensor_applier
     import amp_C
 except Exception:
-    print('WARNING: APEX is not installed and is not supported in KL yet')
+    print("WARNING: APEX is not installed and is not supported in KL yet")
 
-def clip_grad_norm_fp32(parameters, grads_for_norm,
-                        max_norm, norm_type=2,
-                        model_parallel_group=None):
+
+def clip_grad_norm_fp32(
+    parameters, grads_for_norm, max_norm, norm_type=2, model_parallel_group=None
+):
     """Clips gradient norm of an iterable of parameters whose gradients
        are in fp32.
 
@@ -42,7 +44,7 @@ def clip_grad_norm_fp32(parameters, grads_for_norm,
     grads = []
     for param in parameters:
         if param.grad is not None:
-            assert param.grad.type() in ['torch.mlu.FloatTensor']
+            assert param.grad.type() in ["torch.mlu.FloatTensor"]
             grads.append(param.grad.detach())
 
     # Norm parameters.
@@ -55,9 +57,11 @@ def clip_grad_norm_fp32(parameters, grads_for_norm,
         total_norm = max(grad.abs().max() for grad in grads_for_norm)
         total_norm_mlu = torch.mlu.FloatTensor([float(total_norm)])
         # Take max across all model-parallel GPUs.
-        torch.distributed.all_reduce(total_norm_mlu,
-                                     op=torch.distributed.ReduceOp.MAX,
-                                     group=model_parallel_group)
+        torch.distributed.all_reduce(
+            total_norm_mlu,
+            op=torch.distributed.ReduceOp.MAX,
+            group=model_parallel_group,
+        )
         total_norm = total_norm_mlu[0].item()
 
     else:
@@ -71,33 +75,32 @@ def clip_grad_norm_fp32(parameters, grads_for_norm,
                     amp_C.multi_tensor_l2norm,
                     dummy_overflow_buf,
                     [grads_for_norm],
-                    False # no per-parameter norm
+                    False,  # no per-parameter norm
                 )
             else:
                 grad_norm = torch.mlu.FloatTensor([0])
             # Since we will be summing across data parallel groups,
             # we need the pow(norm-type).
-            total_norm = grad_norm ** norm_type
+            total_norm = grad_norm**norm_type
 
         else:
             for grad in grads_for_norm:
                 grad_norm = torch.norm(grad, norm_type)
-                total_norm += grad_norm ** norm_type
+                total_norm += grad_norm**norm_type
 
         # Sum across all model-parallel GPUs.
-        torch.distributed.all_reduce(total_norm,
-                                     op=torch.distributed.ReduceOp.SUM,
-                                     group=model_parallel_group)
+        torch.distributed.all_reduce(
+            total_norm, op=torch.distributed.ReduceOp.SUM, group=model_parallel_group
+        )
         total_norm = total_norm.item() ** (1.0 / norm_type)
 
     # Scale.
     clip_coeff = max_norm / (total_norm + 1.0e-6)
     if clip_coeff < 1.0:
         dummy_overflow_buf = torch.mlu.IntTensor([0])
-        multi_tensor_applier(amp_C.multi_tensor_scale,
-                             dummy_overflow_buf,
-                             [grads, grads],
-                             clip_coeff)
+        multi_tensor_applier(
+            amp_C.multi_tensor_scale, dummy_overflow_buf, [grads, grads], clip_coeff
+        )
 
     return total_norm
 
@@ -122,17 +125,18 @@ def count_zeros_fp32(parameters, model_parallel_group):
             total_num_zeros = num_zeros + total_num_zeros
 
     # Sum across all model-parallel GPUs.
-    torch.distributed.all_reduce(total_num_zeros,
-                                 op=torch.distributed.ReduceOp.SUM,
-                                 group=model_parallel_group)
+    torch.distributed.all_reduce(
+        total_num_zeros, op=torch.distributed.ReduceOp.SUM, group=model_parallel_group
+    )
 
     total_num_zeros = total_num_zeros.item()
 
     return total_num_zeros
 
+
 for k, v in sys.modules.items():
-    if 'megatron' in k and hasattr(v, 'clip_grad_norm_fp32'):
-        setattr(v, 'clip_grad_norm_fp32', clip_grad_norm_fp32)
+    if "megatron" in k and hasattr(v, "clip_grad_norm_fp32"):
+        setattr(v, "clip_grad_norm_fp32", clip_grad_norm_fp32)
 for k, v in sys.modules.items():
-    if 'megatron' in k and hasattr(v, 'count_zeros_fp32'):
-        setattr(v, 'count_zeros_fp32', count_zeros_fp32)
+    if "megatron" in k and hasattr(v, "count_zeros_fp32"):
+        setattr(v, "count_zeros_fp32", count_zeros_fp32)

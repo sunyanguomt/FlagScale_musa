@@ -3,15 +3,23 @@ import torch_mlu
 import megatron
 from megatron.optimizer.grad_scaler import MegatronGradScaler, DynamicGradScaler
 
+
 def MegatronGradScalerInit(self, initial_scale):
     """Initialize scale value with the input initial scale."""
     assert initial_scale > 0.0
     self._scale = torch.mlu.FloatTensor([initial_scale])
 
-def DynamicGradScalerInit(self, initial_scale, min_scale,
-             growth_factor, backoff_factor,
-             growth_interval, hysteresis):
-    """"Grad scaler with dynamic scale that gets adjusted
+
+def DynamicGradScalerInit(
+    self,
+    initial_scale,
+    min_scale,
+    growth_factor,
+    backoff_factor,
+    growth_interval,
+    hysteresis,
+):
+    """ "Grad scaler with dynamic scale that gets adjusted
     during training."""
     super(DynamicGradScaler, self).__init__(initial_scale)
 
@@ -38,11 +46,13 @@ def DynamicGradScalerInit(self, initial_scale, min_scale,
     self._growth_tracker = 0
     self._hysteresis_tracker = self.hysteresis
 
+
 def load_state_dict(self, state_dict):
-    self._scale = state_dict['scale'].mlu(torch.mlu.current_device())
-    self._growth_tracker = state_dict['growth_tracker']
-    self._hysteresis_tracker = state_dict['hysteresis_tracker']
+    self._scale = state_dict["scale"].mlu(torch.mlu.current_device())
+    self._growth_tracker = state_dict["growth_tracker"]
+    self._hysteresis_tracker = state_dict["hysteresis_tracker"]
+
 
 megatron.optimizer.grad_scaler.MegatronGradScaler.__init__ = MegatronGradScalerInit
 megatron.optimizer.grad_scaler.DynamicGradScaler.__init__ = DynamicGradScalerInit
-megatron.optimizer.grad_scaler.DynamicGradScaler.load_state_dict = load_state_dict 
+megatron.optimizer.grad_scaler.DynamicGradScaler.load_state_dict = load_state_dict

@@ -22,12 +22,6 @@ try:
 except ImportError:
     torch_mlu = None
 
-try:
-    import torch_npu
-    from torch_npu.contrib import transfer_to_npu
-except ImportError:
-    pass
-
 from megatron import get_adlr_autoresume
 from megatron import get_args
 from megatron import get_tensorboard_writer
@@ -111,9 +105,23 @@ def initialize_megatron(
         _compile_dependencies()
 
         save_checkpoint_info(args.save)
-
+        _initialize_ckpt_adapter()
         # No continuation function
         return None
+
+
+def _initialize_ckpt_adapter():
+    args = get_args()
+    if not args.enable_async_ckpt:
+        return
+
+    try:
+        import miraccle.mt_megatron_adapter as ckpt_adapter
+
+        # ckpt_adapter.initialize("/data/ckpt/", "/dev/shm", False)
+        ckpt_adapter.initialize(args.local_dir, args.mem_dir, False)
+    except Exception as e:
+        print(f"import ckpt_adapter failed with {e}\n")
 
 
 def _compile_dependencies():

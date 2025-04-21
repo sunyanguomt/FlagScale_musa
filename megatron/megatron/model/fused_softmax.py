@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 from megatron.model.enums import AttnMaskType
 
+
 class ScaledUpperTriangMaskedSoftmax(torch.autograd.Function):
     """
     Fused operation which performs following three operations in sequence
@@ -80,9 +81,7 @@ class ScaledSoftmax(torch.autograd.Function):
 
         scale_t = torch.tensor([scale])
 
-        softmax_results = scaled_softmax_cuda.forward(
-            inputs, scale_t[0]
-        )
+        softmax_results = scaled_softmax_cuda.forward(inputs, scale_t[0])
         ctx.save_for_backward(softmax_results, scale_t)
         return softmax_results
 

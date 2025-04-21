@@ -38,10 +38,13 @@ class TransformerBlock(MegatronModule):
         # required for pipeline parallel schedules
         self.input_tensor = None
 
-        self.checkpoint_core_attention = self.config.recompute_granularity == 'selective'
+        self.checkpoint_core_attention = (
+            self.config.recompute_granularity == "selective"
+        )
 
         self.num_layers_per_pipeline_rank = (
-            self.config.num_layers // parallel_state.get_pipeline_model_parallel_world_size()
+            self.config.num_layers
+            // parallel_state.get_pipeline_model_parallel_world_size()
         )
 
         self._build_layers()
@@ -87,7 +90,9 @@ class TransformerBlock(MegatronModule):
             num_layers_to_build = self.num_layers_per_pipeline_rank
 
         # offset is implicit in TransformerLayer
-        self.layers = torch.nn.ModuleList([build_layer(i + 1) for i in range(num_layers_to_build)])
+        self.layers = torch.nn.ModuleList(
+            [build_layer(i + 1) for i in range(num_layers_to_build)]
+        )
 
         # # TODO: add back standalone_embedding_stage
         # if self.num_layers == 0:
@@ -132,7 +137,7 @@ class TransformerBlock(MegatronModule):
 
             return custom_forward
 
-        if self.config.recompute_method == 'uniform':
+        if self.config.recompute_method == "uniform":
             # Uniformly divide the total number of Transformer layers and checkpoint
             # the input activation of each divided chunk.
             # A method to further reduce memory usage reducing checkpoints.
@@ -148,7 +153,7 @@ class TransformerBlock(MegatronModule):
 
                 l += self.config.recompute_num_layers
 
-        elif self.config.recompute_method == 'block':
+        elif self.config.recompute_method == "block":
             # Checkpoint the input activation of only a set number of individual
             # Transformer layers and skip the rest.
             # A method fully use the device memory removing redundant re-computation.
@@ -162,7 +167,9 @@ class TransformerBlock(MegatronModule):
                         rotary_pos_emb,
                     )
                 else:
-                    hidden_states = custom(l, l + 1)(hidden_states, attention_mask, rotary_pos_emb)
+                    hidden_states = custom(l, l + 1)(
+                        hidden_states, attention_mask, rotary_pos_emb
+                    )
         else:
             raise ValueError("Invalid activation recompute method.")
 
@@ -178,7 +185,9 @@ class TransformerBlock(MegatronModule):
         forward_step_func"""
         self.input_tensor = input_tensor
 
-    def forward(self, hidden_states, attention_mask, inference_params=None, rotary_pos_emb=None):
+    def forward(
+        self, hidden_states, attention_mask, inference_params=None, rotary_pos_emb=None
+    ):
         # hidden_states (float): [s, b, h]
         # attention_mask (bool): [1, 1, s, s]
 
@@ -202,7 +211,9 @@ class TransformerBlock(MegatronModule):
         #   already creates viewless tensors. That said, make_viewless_tensor()
         #   is called here to be future-proof and corner-case-proof.
         hidden_states = make_viewless_tensor(
-            inp=hidden_states, requires_grad=True, keep_graph=True,
+            inp=hidden_states,
+            requires_grad=True,
+            keep_graph=True,
         )
 
         if self.config.sequence_parallel:
@@ -236,7 +247,7 @@ class TransformerBlock(MegatronModule):
 
         with rng_context and fp8_context:
             # Forward pass.
-            if self.config.recompute_granularity == 'full':
+            if self.config.recompute_granularity == "full":
                 hidden_states = self._checkpointed_forward(
                     hidden_states=hidden_states,
                     attention_mask=attention_mask,
@@ -257,25 +268,27 @@ class TransformerBlock(MegatronModule):
 
         return hidden_states
 
-    def sharded_state_dict(self, prefix=''):
+    def sharded_state_dict(self, prefix=""):
 
         sharded_state_dict = {}
 
-        layer_prefix = f'{prefix}layers.'
+        layer_prefix = f"{prefix}layers."
         for layer in self.layers:
             sharded_state_dict.update(layer.sharded_state_dict(prefix=layer_prefix))
 
         if self.post_process and self.post_layer_norm:
             state_dict = self.state_dict(keep_vars=True)
 
-            tensor = state_dict['final_layernorm.weight']
-            layer_name = f'{prefix}final_layernorm.weight'
-            sharded_state_dict[layer_name] = make_sharded_tensor_for_checkpoint(tensor, layer_name)
+            tensor = state_dict["final_layernorm.weight"]
+            layer_name = f"{prefix}final_layernorm.weight"
+            sharded_state_dict[layer_name] = make_sharded_tensor_for_checkpoint(
+                tensor, layer_name
+            )
 
             # RMSNorm doesn't have bias.
-            if 'final_layernorm.bias' in state_dict.keys():
-                tensor = state_dict['final_layernorm.bias']
-                layer_name = f'{prefix}final_layernorm.bias'
+            if "final_layernorm.bias" in state_dict.keys():
+                tensor = state_dict["final_layernorm.bias"]
+                layer_name = f"{prefix}final_layernorm.bias"
                 sharded_state_dict[layer_name] = make_sharded_tensor_for_checkpoint(
                     tensor, layer_name
                 )

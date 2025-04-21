@@ -5,6 +5,7 @@ from typing import List, Tuple, Any
 
 class SeparatorStyle(Enum):
     """Different separator style."""
+
     SINGLE = auto()
     TWO = auto()
     NO_COLON_TWO = auto()
@@ -13,6 +14,7 @@ class SeparatorStyle(Enum):
 @dataclasses.dataclass
 class Conversation:
     """A class that keeps all conversation history."""
+
     system: str
     instruction: str
     roles: List[str]
@@ -65,7 +67,7 @@ class Conversation:
 
     def to_gradio_chatbot(self):
         ret = []
-        for i, (role, msg) in enumerate(self.messages[self.offset:]):
+        for i, (role, msg) in enumerate(self.messages[self.offset :]):
             if i % 2 == 0:
                 ret.append([msg, None])
             else:
@@ -82,7 +84,8 @@ class Conversation:
             sep_style=self.sep_style,
             sep=self.sep,
             sep2=self.sep2,
-            conv_id=self.conv_id)
+            conv_id=self.conv_id,
+        )
 
     def dict(self):
         return {
@@ -95,9 +98,11 @@ class Conversation:
             "sep2": self.sep2,
             "conv_id": self.conv_id,
         }
+
+
 conv_v1 = Conversation(
     system="A chat between a curious human and an artificial intelligence assistant. "
-           "The assistant gives helpful, detailed, and polite answers to the human's questions.",
+    "The assistant gives helpful, detailed, and polite answers to the human's questions.",
     instruction="",
     roles=("Human", "Assistant", "System"),
     messages=(),
@@ -108,7 +113,7 @@ conv_v1 = Conversation(
 
 conv_v1_2 = Conversation(
     system="A chat between a curious human and an artificial intelligence assistant. "
-           "The assistant gives helpful, detailed, and polite answers to the human's questions.",
+    "The assistant gives helpful, detailed, and polite answers to the human's questions.",
     instruction="",
     roles=("Human", "Assistant", "System"),
     messages=(),
@@ -129,7 +134,7 @@ conv_bair_v1 = Conversation(
 )
 conv_aquila_legacy = Conversation(
     system="A chat between a curious human and an artificial intelligence assistant. "
-        "The assistant gives helpful, detailed, and polite answers to the human's questions.\n\n",
+    "The assistant gives helpful, detailed, and polite answers to the human's questions.\n\n",
     instruction="",
     roles=("### Human: ", "### Assistant: ", "System"),
     messages=(),
@@ -143,26 +148,31 @@ default_conversation = conv_v1_2
 conv_templates = {
     "v1": conv_v1_2,
     "bair_v1": conv_bair_v1,
-    "aquila-legacy": conv_aquila_legacy
+    "aquila-legacy": conv_aquila_legacy,
 }
 
-def covert_prompt_to_input_ids_with_history(text, history, tokenizer, max_token, template="v1"):
+
+def covert_prompt_to_input_ids_with_history(
+    text, history, tokenizer, max_token, template="v1"
+):
 
     conv = conv_templates.get(template, "None").copy()
     if conv is None:
-        raise KeyError("conversation template is error, please input v1, bair_v1 or aquila-legacy")
+        raise KeyError(
+            "conversation template is error, please input v1, bair_v1 or aquila-legacy"
+        )
     conv.append_message(conv.roles[1], None)
     conv.append_message(conv.roles[0], text)
 
     example = tokenizer.tokenize(f"{conv.get_prompt()} ")
 
-    while(len(history) > 0 and (len(example) < max_token)):
+    while len(history) > 0 and (len(example) < max_token):
         tmp = history.pop()
-        if tmp[0] == 'SYSTEM':
+        if tmp[0] == "SYSTEM":
             conv.append_message(conv.roles[1], tmp[1])
         else:
             conv.append_message(conv.roles[0], tmp[1])
-    
+
         example = tokenizer.tokenize(f"{conv.get_prompt()} ")
 
     if len(example) >= max_token:

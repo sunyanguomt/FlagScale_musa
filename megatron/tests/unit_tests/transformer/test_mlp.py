@@ -9,12 +9,18 @@ from tests.unit_tests.test_utilities import Utils
 from megatron.core.tensor_parallel.random import model_parallel_cuda_manual_seed
 from megatron.core.transformer.transformer_config import TransformerConfig
 
+
 class TestParallelMLP:
 
     def setup_method(self, method):
-        Utils.initialize_model_parallel(1,1)
+        Utils.initialize_model_parallel(1, 1)
         model_parallel_cuda_manual_seed(123)
-        transformer_config = TransformerConfig(num_layers=2, hidden_size=12, num_attention_heads=4, use_cpu_initialization=True)
+        transformer_config = TransformerConfig(
+            num_layers=2,
+            hidden_size=12,
+            num_attention_heads=4,
+            use_cpu_initialization=True,
+        )
         self.mlp = MLP(transformer_config)
 
     def teardown_method(self, method):
@@ -51,6 +57,5 @@ class TestParallelMLP:
         assert output.shape[2] == mlp.config.hidden_size
         assert output_bias.shape[0] == mlp.config.hidden_size
         assert output.dtype == torch.float32
-        assert output.device.type == 'cuda'
-        assert output_bias.device.type == 'cuda'
-
+        assert output.device.type == "cuda"
+        assert output_bias.device.type == "cuda"

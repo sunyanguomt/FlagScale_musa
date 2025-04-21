@@ -1,6 +1,7 @@
 """
 This script is based on Megatron's checkpoint_loader_megatron.py, but it only load the distributed optimizer state.
 """
+
 import json
 import os
 import sys
@@ -181,10 +182,9 @@ def _load_checkpoint(queue, args):
             md.load, tp_size, pp_size, md.iteration
         )
     else:
-        param_index_map_paths = get_param_index_map_paths(
-             md.load, tp_size, pp_size, 0 
-        )
+        param_index_map_paths = get_param_index_map_paths(md.load, tp_size, pp_size, 0)
     param_index_maps = [[None for _ in range(pp_size)] for _ in range(tp_size)]
+
     def get_param_index_map(param_index_maps, param_index_map_paths, tp_rank, pp_rank):
         if param_index_maps[tp_rank][pp_rank] is None:
             param_index_map_path = param_index_map_paths[tp_rank][pp_rank]
@@ -327,8 +327,13 @@ def _load_checkpoint(queue, args):
         total_layer_num = 0
         for vp_rank in range(vp_size):
             for pp_rank in range(pp_size):
-                num_layers = get_num_layers_from_args(md.num_layers, pp_size, pp_rank,
-                                                      hetero_pipeline_stages, hetero_pipeline_stage_splits)
+                num_layers = get_num_layers_from_args(
+                    md.num_layers,
+                    pp_size,
+                    pp_rank,
+                    hetero_pipeline_stages,
+                    hetero_pipeline_stage_splits,
+                )
                 for layer_num in range(num_layers):
                     message = {}
                     # Get non-parallel tensors from tp_rank 0
@@ -340,21 +345,25 @@ def _load_checkpoint(queue, args):
                         pp_rank,
                         vp_size,
                     )
-                    message[
-                        f"input layernorm weight {state_key}"
-                    ] = get_optimizer_state(
-                        optimizer_ckpt, layer_num, vp_rank, state_key, "input_layernorm"
-                    )
-                    if not md.apply_layernorm_rms:
-                        message[
-                            f"input layernorm bias {state_key}"
-                        ] = get_optimizer_state(
+                    message[f"input layernorm weight {state_key}"] = (
+                        get_optimizer_state(
                             optimizer_ckpt,
                             layer_num,
                             vp_rank,
                             state_key,
                             "input_layernorm",
-                            True,
+                        )
+                    )
+                    if not md.apply_layernorm_rms:
+                        message[f"input layernorm bias {state_key}"] = (
+                            get_optimizer_state(
+                                optimizer_ckpt,
+                                layer_num,
+                                vp_rank,
+                                state_key,
+                                "input_layernorm",
+                                True,
+                            )
                         )
                     message[f"post layernorm weight {state_key}"] = get_optimizer_state(
                         optimizer_ckpt,
@@ -364,15 +373,15 @@ def _load_checkpoint(queue, args):
                         "post_attention_layernorm",
                     )
                     if not md.apply_layernorm_rms:
-                        message[
-                            f"post layernorm bias {state_key}"
-                        ] = get_optimizer_state(
-                            optimizer_ckpt,
-                            layer_num,
-                            vp_rank,
-                            state_key,
-                            "post_attention_layernorm",
-                            True,
+                        message[f"post layernorm bias {state_key}"] = (
+                            get_optimizer_state(
+                                optimizer_ckpt,
+                                layer_num,
+                                vp_rank,
+                                state_key,
+                                "post_attention_layernorm",
+                                True,
+                            )
                         )
                     if md.linear_bias:
                         message[f"dense bias {state_key}"] = get_optimizer_state(

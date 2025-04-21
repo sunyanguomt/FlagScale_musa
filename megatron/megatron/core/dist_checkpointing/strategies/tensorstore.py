@@ -25,9 +25,9 @@ class TensorStoreLoadShardedStrategy(LoadShardedStrategy):
 
     def load(self, sharded_state_dict: ShardedStateDict, checkpoint_dir: Path):
         if torch.distributed.get_rank() == 0:
-            print(f'Loading distributed checkpoint with {self.__class__.__name__}')
+            print(f"Loading distributed checkpoint with {self.__class__.__name__}")
             if self.load_directly_on_device:
-                print(f'Loading distributed checkpoint directly on the GPU')
+                print(f"Loading distributed checkpoint directly on the GPU")
         load_fn = partial(
             _load_from_array,
             checkpoint_dir=checkpoint_dir,
@@ -48,7 +48,7 @@ def merge_global_slice_with_shape(global_slice, actual_shape, key):
         if isinstance(dim_slice, slice):
             assert (
                 dim_slice.start < dim_size
-            ), f'Got empty slice for ShardedTensor {key} ({dim_slice}, {dim_size})'
+            ), f"Got empty slice for ShardedTensor {key} ({dim_slice}, {dim_size})"
             if dim_slice.stop > dim_size:
                 dim_slice = slice(dim_slice.start, dim_size, dim_slice.step)
         return dim_slice
@@ -74,16 +74,16 @@ def _load_from_array(
 
 def _load_regular_chunk(sharded_tensor: ShardedTensor, checkpoint_dir: Path):
     assert isinstance(sharded_tensor, ShardedTensor), type(sharded_tensor)
-    spec = {'driver': 'zarr', 'metadata_key': '.zarray', 'kvstore': {}}
-    spec['kvstore'] = {
-        'driver': 'file',
-        'path': str(checkpoint_dir / sharded_tensor.key),
+    spec = {"driver": "zarr", "metadata_key": ".zarray", "kvstore": {}}
+    spec["kvstore"] = {
+        "driver": "file",
+        "path": str(checkpoint_dir / sharded_tensor.key),
     }
     try:
         arr = ts.open(ts.Spec(spec), open=True).result()
     except Exception as e:
         raise CheckpointingException(
-            f'Array {checkpoint_dir / sharded_tensor.key} could not be loaded. Error: {e}'
+            f"Array {checkpoint_dir / sharded_tensor.key} could not be loaded. Error: {e}"
         ) from e
 
     if sharded_tensor.global_shape == arr.shape:
@@ -97,14 +97,14 @@ def _load_regular_chunk(sharded_tensor: ShardedTensor, checkpoint_dir: Path):
         x = arr[global_slice].read().result()  # flattened tensors loading is delayed
     else:
         _msg = (
-            f'Global shape mismatch for loaded ({arr.shape})'
-            f' and expected ({sharded_tensor.global_shape}) tensor'
-            f' for key {sharded_tensor.key}'
+            f"Global shape mismatch for loaded ({arr.shape})"
+            f" and expected ({sharded_tensor.global_shape}) tensor"
+            f" for key {sharded_tensor.key}"
         )
         raise CheckpointingException(_msg)
     return x
 
 
 default_strategies[StrategyAction.LOAD_SHARDED.value][
-    ('zarr', 1)
+    ("zarr", 1)
 ] = TensorStoreLoadShardedStrategy()

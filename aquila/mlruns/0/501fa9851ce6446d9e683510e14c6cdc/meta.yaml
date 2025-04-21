@@ -1,0 +1,15 @@
+artifact_uri: file:///home/dist/qiyulei/test/FlagScale/aquila/mlruns/0/501fa9851ce6446d9e683510e14c6cdc/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 501fa9851ce6446d9e683510e14c6cdc
+run_name: valuable-shark-696
+run_uuid: 501fa9851ce6446d9e683510e14c6cdc
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1733383410543
+status: 1
+tags: []
+user_id: root

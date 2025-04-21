@@ -15,18 +15,18 @@ from .dataset import DBDataset
 
 
 def get_base_db_workdir():
-    '''Sub-directory for DB data.'''
+    """Sub-directory for DB data."""
     args = get_retro_args()
     return os.path.join(args.retro_workdir, "db")
 
 
 def get_indexed_dataset_infos_path():
-    '''Path to indexed dataset meta-infos.'''
+    """Path to indexed dataset meta-infos."""
     return os.path.join(get_base_db_workdir(), "indexed_dataset_infos.json")
 
 
 def save_indexed_dataset_infos(indexed_dataset_infos):
-    '''Save dataset order & meta-info.'''
+    """Save dataset order & meta-info."""
 
     # Remove 'dataset' field.
     clean_infos = []
@@ -41,7 +41,7 @@ def save_indexed_dataset_infos(indexed_dataset_infos):
 
 
 def get_indexed_dataset_infos():
-    '''Load indexed dataset meta-infos.'''
+    """Load indexed dataset meta-infos."""
 
     # Load json.
     path = get_indexed_dataset_infos_path()
@@ -56,12 +56,12 @@ def get_indexed_dataset_infos():
 
 
 def get_individual_db_dir(name):
-    '''Individual DB's directory.'''
+    """Individual DB's directory."""
     return os.path.join(get_base_db_workdir(), "individual", name)
 
 
 def get_individual_chunk_db(ds_id, ds_info):
-    '''Load individual dataset's chunk DB.'''
+    """Load individual dataset's chunk DB."""
     db_paths = sorted(glob.glob(ds_info["db_dir"] + "/*hdf5"))
     # *Note*: convert to dataset, rather than copying to memory.
     db = np.zeros((ds_info["n_chunks"], 5), dtype="uint32")
@@ -70,7 +70,7 @@ def get_individual_chunk_db(ds_id, ds_info):
     for db_path in db_paths:
         f = h5py.File(db_path, "r")
         n_chunks_current = f["chunks_valid"].shape[0]
-        db[start_idx:(start_idx+n_chunks_current), 1:] = f["chunks_valid"]
+        db[start_idx : (start_idx + n_chunks_current), 1:] = f["chunks_valid"]
         start_idx += n_chunks_current
         f.close()
 
@@ -80,7 +80,7 @@ def get_individual_chunk_db(ds_id, ds_info):
 
 
 def get_individual_doc_offsets(ds_id, ds_info):
-    '''Load individual dataset's chunk DB.'''
+    """Load individual dataset's chunk DB."""
     paths = sorted(glob.glob(ds_info["db_dir"] + "/*hdf5"))
     # *Note*: convert to dataset, rather than copying to memory.
     doc_offsets = np.zeros((ds_info["n_docs"], 3), dtype="uint64")
@@ -92,8 +92,9 @@ def get_individual_doc_offsets(ds_id, ds_info):
             current_doc_offsets = np.copy(f["doc_offsets"])
             current_doc_offsets[:, 1] += start_offset
             current_ndocs = current_doc_offsets.shape[0]
-            doc_offsets[start_idx:(start_idx+current_ndocs), 1:] = \
+            doc_offsets[start_idx : (start_idx + current_ndocs), 1:] = (
                 current_doc_offsets
+            )
             start_idx += current_ndocs
             start_offset = current_doc_offsets[-1, 1].item()
 
@@ -101,17 +102,17 @@ def get_individual_doc_offsets(ds_id, ds_info):
 
 
 def get_merged_db_path_map():
-    '''Paths to merged datasets.'''
+    """Paths to merged datasets."""
     base_dir = get_base_db_workdir()
     return {
-        "sampled" : os.path.join(base_dir, "merged", "sampled.hdf5"),
-        "train" : os.path.join(base_dir, "merged", "train.hdf5"),
-        "valid" : os.path.join(base_dir, "merged", "valid.hdf5"),
+        "sampled": os.path.join(base_dir, "merged", "sampled.hdf5"),
+        "train": os.path.join(base_dir, "merged", "train.hdf5"),
+        "valid": os.path.join(base_dir, "merged", "valid.hdf5"),
     }
 
 
 def get_merged_dataset(db_type, indexed_dataset_infos=None):
-    '''Get merged dataset.'''
+    """Get merged dataset."""
 
     args = get_retro_args()
 
@@ -124,9 +125,8 @@ def get_merged_dataset(db_type, indexed_dataset_infos=None):
     chunks = f["chunks"]
 
     # DB dataset.
-    indexed_datasets = [ info["dataset"] for info in indexed_dataset_infos ]
-    dataset = DBDataset(db_path, indexed_datasets, chunks,
-                        args.retro_gpt_chunk_length)
+    indexed_datasets = [info["dataset"] for info in indexed_dataset_infos]
+    dataset = DBDataset(db_path, indexed_datasets, chunks, args.retro_gpt_chunk_length)
 
     return dataset
 

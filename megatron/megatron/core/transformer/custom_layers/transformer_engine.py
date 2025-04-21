@@ -20,7 +20,7 @@ def _get_extra_te_kwargs(config: TransformerConfig):
     te_version = packaging.version.Version(version("transformer-engine"))
     if te_version >= packaging.version.Version("0.12.0"):
         if config.use_cpu_initialization:
-            extra_transformer_engine_kwargs["device"] = 'cpu'
+            extra_transformer_engine_kwargs["device"] = "cpu"
         else:
             extra_transformer_engine_kwargs["device"] = torch.cuda.current_device()
     return extra_transformer_engine_kwargs
@@ -59,7 +59,7 @@ class TENorm:
                 **_get_extra_te_kwargs(config),
             )
         else:
-            raise Exception('Only LayerNorm and RMSNorm are curently supported')
+            raise Exception("Only LayerNorm and RMSNorm are curently supported")
 
         return instance
 
@@ -185,7 +185,9 @@ class TEColumnParallelLinear(TELinear):
     to megatron's `ColumnParallelLinear` layer.
     """
 
-    def __init__(self, input_size: int, output_size: int, config: TransformerConfig, **kwargs):
+    def __init__(
+        self, input_size: int, output_size: int, config: TransformerConfig, **kwargs
+    ):
         self.config = config
         super().__init__(
             input_size=input_size,
@@ -202,7 +204,9 @@ class TERowParallelLinear(TELinear):
     to megatron's `RowParallelLinear` layer.
     """
 
-    def __init__(self, input_size: int, output_size: int, config: TransformerConfig, **kwargs):
+    def __init__(
+        self, input_size: int, output_size: int, config: TransformerConfig, **kwargs
+    ):
         self.config = config
         super().__init__(
             input_size=input_size,

@@ -7,9 +7,53 @@ import amp_C
 from megatron.model.module import param_is_not_shared
 from megatron.core.tensor_parallel import param_is_not_tensor_parallel_duplicate
 
-def clip_grad_norm_fp32(parameters, grads_for_norm,
-                        max_norm, norm_type=2,
-                        model_parallel_group=None):
+
+def get_max_grads(grads_for_norm, model_parallel_group):
+    total_norm = max(grad.abs().max() for grad in grads_for_norm)
+    total_norm_cuda = torch.musa.FloatTensor([float(total_norm)])
+    # Take max across all model-parallel GPUs.
+    torch.distributed.all_reduce(
+        total_norm_cuda, op=torch.distributed.ReduceOp.MAX, group=model_parallel_group
+    )
+    total_norm = total_norm_cuda[0].item()
+    return total_norm
+
+
+def get_norm_grads(grads_for_norm, norm_type, model_parallel_group):
+
+    if norm_type == 2.0:
+        dummy_overflow_buf = torch.musa.IntTensor([0])
+        # Use apex's multi-tensor applier for efficiency reasons.
+        # Multi-tensor applier takes a function and a list of list
+        # and performs the operation on that list all in one kernel.
+        if grads_for_norm:
+            grad_norm, _ = multi_tensor_applier(
+                amp_C.multi_tensor_l2norm,
+                dummy_overflow_buf,
+                [grads_for_norm],
+                False,  # no per-parameter norm
+            )
+        else:
+            grad_norm = torch.musa.FloatTensor([0])
+        # Since we will be summing across data parallel groups,
+        # we need the pow(norm-type).
+        total_norm = grad_norm**norm_type
+    else:
+        for grad in grads_for_norm:
+            grad_norm = torch.norm(grad, norm_type)
+            total_norm += grad_norm**norm_type
+
+    # Sum across all model-parallel GPUs.
+    torch.distributed.all_reduce(
+        total_norm, op=torch.distributed.ReduceOp.SUM, group=model_parallel_group
+    )
+    total_norm = total_norm.item() ** (1.0 / norm_type)
+    return total_norm
+
+
+def clip_grad_norm_fp32(
+    parameters, grads_for_norm, max_norm, norm_type=2, model_parallel_group=None
+):
     """Clips gradient norm of an iterable of parameters whose gradients
        are in fp32.
 
@@ -41,7 +85,7 @@ def clip_grad_norm_fp32(parameters, grads_for_norm,
     grads = []
     for param in parameters:
         if param.grad is not None:
-            assert param.grad.type() == 'torch.musa.FloatTensor'
+            assert param.grad.type() == "torch.musa.FloatTensor"
             grads.append(param.grad.detach())
 
     # Norm parameters.
@@ -54,12 +98,15 @@ def clip_grad_norm_fp32(parameters, grads_for_norm,
         total_norm = max(grad.abs().max() for grad in grads_for_norm)
         total_norm_cuda = torch.musa.FloatTensor([float(total_norm)])
         # Take max across all model-parallel GPUs.
-        torch.distributed.all_reduce(total_norm_cuda,
-                                     op=torch.distributed.ReduceOp.MAX,
-                                     group=model_parallel_group)
+        torch.distributed.all_reduce(
+            total_norm_cuda,
+            op=torch.distributed.ReduceOp.MAX,
+            group=model_parallel_group,
+        )
         total_norm = total_norm_cuda[0].item()
 
     else:
+        max_total_norm_before = get_max_grads(grads_for_norm, model_parallel_group)
         if norm_type == 2.0:
             dummy_overflow_buf = torch.musa.IntTensor([0])
             # Use apex's multi-tensor applier for efficiency reasons.
@@ -70,35 +117,46 @@ def clip_grad_norm_fp32(parameters, grads_for_norm,
                     amp_C.multi_tensor_l2norm,
                     dummy_overflow_buf,
                     [grads_for_norm],
-                    False # no per-parameter norm
+                    False,  # no per-parameter norm
                 )
             else:
                 grad_norm = torch.musa.FloatTensor([0])
             # Since we will be summing across data parallel groups,
             # we need the pow(norm-type).
-            total_norm = grad_norm ** norm_type
+            total_norm = grad_norm**norm_type
 
         else:
             for grad in grads_for_norm:
                 grad_norm = torch.norm(grad, norm_type)
-                total_norm += grad_norm ** norm_type
+                total_norm += grad_norm**norm_type
 
         # Sum across all model-parallel GPUs.
-        torch.distributed.all_reduce(total_norm,
-                                     op=torch.distributed.ReduceOp.SUM,
-                                     group=model_parallel_group)
+        torch.distributed.all_reduce(
+            total_norm, op=torch.distributed.ReduceOp.SUM, group=model_parallel_group
+        )
         total_norm = total_norm.item() ** (1.0 / norm_type)
 
     # Scale.
     clip_coeff = max_norm / (total_norm + 1.0e-6)
+    max_total_norm_after = -10
     if clip_coeff < 1.0:
         dummy_overflow_buf = torch.musa.IntTensor([0])
-        multi_tensor_applier(amp_C.multi_tensor_scale,
-                             dummy_overflow_buf,
-                             [grads, grads],
-                             clip_coeff)
+        multi_tensor_applier(
+            amp_C.multi_tensor_scale, dummy_overflow_buf, [grads, grads], clip_coeff
+        )
+        total_norm_after = get_norm_grads(
+            grads_for_norm, norm_type, model_parallel_group
+        )
+        max_total_norm_after = get_max_grads(grads_for_norm, model_parallel_group)
+        return [
+            max_total_norm_before,
+            total_norm,
+            max_total_norm_after,
+            total_norm_after,
+        ]
 
-    return total_norm
+    return [max_total_norm_before, total_norm]  # total_norm
+
 
 def count_zeros_fp32(parameters, model_parallel_group):
 
@@ -120,9 +178,9 @@ def count_zeros_fp32(parameters, model_parallel_group):
             total_num_zeros = num_zeros + total_num_zeros
 
     # Sum across all model-parallel GPUs.
-    torch.distributed.all_reduce(total_num_zeros,
-                                 op=torch.distributed.ReduceOp.SUM,
-                                 group=model_parallel_group)
+    torch.distributed.all_reduce(
+        total_num_zeros, op=torch.distributed.ReduceOp.SUM, group=model_parallel_group
+    )
 
     total_num_zeros = total_num_zeros.item()
 
@@ -130,7 +188,8 @@ def count_zeros_fp32(parameters, model_parallel_group):
 
 
 import sys
+
 for k in sys.modules:
-    if k.startswith('megatron.optimizer'):
-        if getattr(sys.modules[k], 'clip_grad_norm_fp32', None):
-            setattr(sys.modules[k], 'clip_grad_norm_fp32', clip_grad_norm_fp32)
+    if k.startswith("megatron.optimizer"):
+        if getattr(sys.modules[k], "clip_grad_norm_fp32", None):
+            setattr(sys.modules[k], "clip_grad_norm_fp32", clip_grad_norm_fp32)

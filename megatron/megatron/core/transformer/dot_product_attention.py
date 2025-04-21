@@ -31,7 +31,10 @@ class DotProductAttention(MegatronModule):
     """
 
     def __init__(
-        self, config: TransformerConfig, layer_number: int = 1, attn_mask_type=AttnMaskType.padding
+        self,
+        config: TransformerConfig,
+        layer_number: int = 1,
+        attn_mask_type=AttnMaskType.padding,
     ):
         super().__init__(config=config)
 
@@ -45,8 +48,12 @@ class DotProductAttention(MegatronModule):
         # Per attention head and per partition values.
         world_size = parallel_state.get_tensor_model_parallel_world_size()
         self.hidden_size_per_partition = divide(projection_size, world_size)
-        self.hidden_size_per_attention_head = divide(projection_size, config.num_attention_heads)
-        self.num_attention_heads_per_partition = divide(config.num_attention_heads, world_size)
+        self.hidden_size_per_attention_head = divide(
+            projection_size, config.num_attention_heads
+        )
+        self.num_attention_heads_per_partition = divide(
+            config.num_attention_heads, world_size
+        )
 
         coeff = None
         self.norm_factor = math.sqrt(self.hidden_size_per_attention_head)
@@ -70,7 +77,11 @@ class DotProductAttention(MegatronModule):
         self.attention_dropout = torch.nn.Dropout(self.config.attention_dropout)
 
     def forward(
-        self, query_layer: Tensor, key_layer: Tensor, value_layer: Tensor, attention_mask: Tensor
+        self,
+        query_layer: Tensor,
+        key_layer: Tensor,
+        value_layer: Tensor,
+        attention_mask: Tensor,
     ):
 
         # ===================================
@@ -89,7 +100,9 @@ class DotProductAttention(MegatronModule):
         # This will be a simple view when doing normal attention, but in group query attention
         # the key and value tensors are repeated to match the queries so you can't use simple strides
         # to extract the queries.
-        query_layer = query_layer.reshape(output_size[2], output_size[0] * output_size[1], -1)
+        query_layer = query_layer.reshape(
+            output_size[2], output_size[0] * output_size[1], -1
+        )
         # [sk, b, np, hn] -> [sk, b * np, hn]
         key_layer = key_layer.view(output_size[3], output_size[0] * output_size[1], -1)
 
@@ -117,7 +130,9 @@ class DotProductAttention(MegatronModule):
         # ===========================
 
         # attention scores and attention mask [b, np, sq, sk]
-        attention_probs: Tensor = self.scale_mask_softmax(attention_scores, attention_mask)
+        attention_probs: Tensor = self.scale_mask_softmax(
+            attention_scores, attention_mask
+        )
 
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
@@ -144,10 +159,14 @@ class DotProductAttention(MegatronModule):
         )
 
         # change view [sk, b * np, hn]
-        value_layer = value_layer.view(value_layer.size(0), output_size[0] * output_size[1], -1)
+        value_layer = value_layer.view(
+            value_layer.size(0), output_size[0] * output_size[1], -1
+        )
 
         # change view [b * np, sq, sk]
-        attention_probs = attention_probs.view(output_size[0] * output_size[1], output_size[2], -1)
+        attention_probs = attention_probs.view(
+            output_size[0] * output_size[1], output_size[2], -1
+        )
 
         # matmul: [b * np, sq, hn]
         context_layer = torch.bmm(attention_probs, value_layer.transpose(0, 1))
@@ -159,7 +178,9 @@ class DotProductAttention(MegatronModule):
         context_layer = context_layer.permute(2, 0, 1, 3).contiguous()
 
         # [sq, b, np, hn] --> [sq, b, hp]
-        new_context_layer_shape = context_layer.size()[:-2] + (self.hidden_size_per_partition,)
+        new_context_layer_shape = context_layer.size()[:-2] + (
+            self.hidden_size_per_partition,
+        )
         context_layer = context_layer.view(*new_context_layer_shape)
 
         return context_layer

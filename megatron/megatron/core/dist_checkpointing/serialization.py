@@ -37,7 +37,7 @@ from .strategies.base import (
 )
 from .utils import extract_sharded_tensors, extract_sharded_tensors_or_nonpersistent
 
-COMMON_STATE_FNAME = 'common.pt'
+COMMON_STATE_FNAME = "common.pt"
 
 logger = logging.getLogger(__name__)
 
@@ -59,22 +59,28 @@ def load(
         common_strategy: configures loading behavior for common data
     """
     if common_strategy is not None:
-        raise NotImplementedError('The only supported common strategy is torch')
+        raise NotImplementedError("The only supported common strategy is torch")
 
     checkpoint_dir = Path(checkpoint_dir)
     common_state_dict = load_common_state_dict(checkpoint_dir)
     if not sharded_state_dict:
         return common_state_dict
 
-    sharded_objects, sharded_state_dict = load_sharded_objects(sharded_state_dict, checkpoint_dir)
+    sharded_objects, sharded_state_dict = load_sharded_objects(
+        sharded_state_dict, checkpoint_dir
+    )
     merge(common_state_dict, sharded_objects)
 
     saved_config = maybe_load_config(checkpoint_dir)
     if saved_config is None:
-        raise CheckpointingException(f'{checkpoint_dir} is not a distributed checkpoint')
+        raise CheckpointingException(
+            f"{checkpoint_dir} is not a distributed checkpoint"
+        )
 
     sharded_state_dict, _ = extract_sharded_tensors_or_nonpersistent(sharded_state_dict)
-    sharded_state_dict, nonpersistent_state_dict = extract_sharded_tensors(sharded_state_dict)
+    sharded_state_dict, nonpersistent_state_dict = extract_sharded_tensors(
+        sharded_state_dict
+    )
     dict_list_map_inplace(lambda o: o.unwrap(), nonpersistent_state_dict)
     merge(common_state_dict, nonpersistent_state_dict)
 
@@ -97,7 +103,7 @@ def load(
 
 # TODO: implement it as common torch strategy
 def load_common_state_dict(checkpoint_dir: Path):
-    return torch.load(Path(checkpoint_dir) / COMMON_STATE_FNAME, map_location='cpu')
+    return torch.load(Path(checkpoint_dir) / COMMON_STATE_FNAME, map_location="cpu")
 
 
 def load_sharded_objects(sharded_state_dict: ShardedStateDict, checkpoint_dir: Path):
@@ -107,11 +113,14 @@ def load_sharded_objects(sharded_state_dict: ShardedStateDict, checkpoint_dir: P
 
     def load_sharded_object(sh_obj: ShardedObject):
         sh_obj.data = None
-        load_path = (checkpoint_dir / sh_obj.unique_key).with_suffix('.pt')
+        load_path = (checkpoint_dir / sh_obj.unique_key).with_suffix(".pt")
         loaded_obj = torch.load(load_path)
         return loaded_obj
 
-    return dict_list_map_inplace(load_sharded_object, sharded_objects), sharded_state_dict
+    return (
+        dict_list_map_inplace(load_sharded_object, sharded_objects),
+        sharded_state_dict,
+    )
 
 
 def save(
@@ -140,21 +149,23 @@ def save(
     if torch.distributed.get_rank() == 0:
         if not checkpoint_dir.exists():
             raise CheckpointingException(
-                f'Checkpoint destination directory does not exist: {checkpoint_dir}'
+                f"Checkpoint destination directory does not exist: {checkpoint_dir}"
             )
 
         if next(checkpoint_dir.iterdir(), None) is not None:
             raise CheckpointingException(
-                f'Checkpoint destination directory ({checkpoint_dir}) is not empty'
+                f"Checkpoint destination directory ({checkpoint_dir}) is not empty"
             )
 
     if common_strategy is not None:
-        raise NotImplementedError('The only supported common strategy is torch')
+        raise NotImplementedError("The only supported common strategy is torch")
 
     if sharded_strategy is None:
-        sharded_strategy = get_default_strategy(StrategyAction.SAVE_SHARDED, 'zarr', 1)
+        sharded_strategy = get_default_strategy(StrategyAction.SAVE_SHARDED, "zarr", 1)
 
-    sharded_state_dict, state_dict = extract_sharded_tensors_or_nonpersistent(sharded_state_dict)
+    sharded_state_dict, state_dict = extract_sharded_tensors_or_nonpersistent(
+        sharded_state_dict
+    )
     sharded_state_dict, _ = extract_sharded_tensors(sharded_state_dict)
     sharded_tensors = list(nested_values(sharded_state_dict))
     validate_sharding_integrity(sharded_tensors)
@@ -163,7 +174,8 @@ def save(
 
     sharded_strategy.save(sharded_tensors, checkpoint_dir)
     save_config(
-        CheckpointingConfig(sharded_strategy.backend, sharded_strategy.version), checkpoint_dir
+        CheckpointingConfig(sharded_strategy.backend, sharded_strategy.version),
+        checkpoint_dir,
     )
 
 
@@ -196,7 +208,7 @@ def _extract_and_save_sharded_objects(
         validate_objects_sharding_integrity(sharded_objects)
     for sh_obj in sharded_objects:
         if is_main_replica(sh_obj.replica_id):
-            save_path = (checkpoint_dir / sh_obj.unique_key).with_suffix('.pt')
+            save_path = (checkpoint_dir / sh_obj.unique_key).with_suffix(".pt")
             os.makedirs(save_path.parent, exist_ok=True)
             torch.save(sh_obj.data, save_path)
     return state_dict
@@ -224,7 +236,10 @@ def _validate_sharding_for_key(rank_sharding: List[Tuple[int, ShardedTensor]]):
     has_flattened_range = rank_sharding[0][1].flattened_range is not None
     for rank, sharding in rank_sharding:
         assert sharding.dtype == dtype, (sharding.dtype, dtype)
-        assert sharding.global_shape == global_shape, (sharding.global_shape, global_shape)
+        assert sharding.global_shape == global_shape, (
+            sharding.global_shape,
+            global_shape,
+        )
         assert sharding.local_shape == local_shape, (sharding.local_shape, local_shape)
         assert (sharding.flattened_range is not None) == has_flattened_range, (
             (sharding.flattened_range is not None),
@@ -241,27 +256,35 @@ def _validate_sharding_for_key(rank_sharding: List[Tuple[int, ShardedTensor]]):
         )
     else:
         if not torch.all(shard_access_cnt == 1):
-            logger.error(f'Invalid access pattern for {rank_sharding[0][1]}: {shard_access_cnt}')
-            raise CheckpointingException(f'Invalid access pattern for {rank_sharding[0][1]}')
+            logger.error(
+                f"Invalid access pattern for {rank_sharding[0][1]}: {shard_access_cnt}"
+            )
+            raise CheckpointingException(
+                f"Invalid access pattern for {rank_sharding[0][1]}"
+            )
 
 
 def _compute_shards_access(rank_sharding):
     def chunk_offset(sharding):
-        assert len(sharding.global_offset) == len(sharding.local_shape) + sharding.prepend_axis_num
+        assert (
+            len(sharding.global_offset)
+            == len(sharding.local_shape) + sharding.prepend_axis_num
+        )
         return tuple(
             chain(
                 (off for off in sharding.global_offset[: sharding.prepend_axis_num]),
                 (
                     off // sh
                     for off, sh in zip(
-                        sharding.global_offset[sharding.prepend_axis_num :], sharding.local_shape
+                        sharding.global_offset[sharding.prepend_axis_num :],
+                        sharding.local_shape,
                     )
                 ),
             )
         )
 
     shard_access_cnt = torch.zeros(
-        rank_sharding[0][1].axis_fragmentations, dtype=torch.int, device='cpu'
+        rank_sharding[0][1].axis_fragmentations, dtype=torch.int, device="cpu"
     )
     for rank, sharding in rank_sharding:
         if is_main_replica(sharding.replica_id):
@@ -280,7 +303,9 @@ def _validate_sharding_for_key_flattened(tensors_by_shard):
             # TODO: this checks only saving (and loading replica_id=0) consistency
             continue
 
-        all_slices.append((sharding.flattened_range.start, sharding.flattened_range.stop))
+        all_slices.append(
+            (sharding.flattened_range.start, sharding.flattened_range.stop)
+        )
 
     starts, stops = map(np.asarray, zip(*sorted(all_slices)))
     if (
@@ -289,15 +314,15 @@ def _validate_sharding_for_key_flattened(tensors_by_shard):
         or not np.all(starts[1:] == stops[:-1])
     ):
         logger.error(
-            f'Flattened ranges dont cover the whole shard {tensors_by_shard[0]}. Ranges: {(starts, stops)}'
+            f"Flattened ranges dont cover the whole shard {tensors_by_shard[0]}. Ranges: {(starts, stops)}"
         )
         raise CheckpointingException(
-            f'Flattened ranges dont cover the whole shard {tensors_by_shard[0]}'
+            f"Flattened ranges dont cover the whole shard {tensors_by_shard[0]}"
         )
 
 
 def validate_objects_sharding_integrity(sharded_objects: List[ShardedObject]):
-    """ Ensure uniqueness of saved objects. """
+    """Ensure uniqueness of saved objects."""
     local_sh_objs = [sh_obj.without_data() for sh_obj in sharded_objects]
     all_sh_objs = [None] * torch.distributed.get_world_size()
     torch.distributed.all_gather_object(all_sh_objs, local_sh_objs)
@@ -310,5 +335,7 @@ def validate_objects_sharding_integrity(sharded_objects: List[ShardedObject]):
     ]
     if len(unique_keys) != len(set(unique_keys)):
         duplicates = {k: cnt for k, cnt in Counter(unique_keys).items() if cnt > 1}
-        logger.error(f'Duplicate ShardedObject keys and counts: {duplicates}')
-        raise CheckpointingException(f'Duplicate ShardedObject keys: {list(duplicates.keys())}')
+        logger.error(f"Duplicate ShardedObject keys and counts: {duplicates}")
+        raise CheckpointingException(
+            f"Duplicate ShardedObject keys: {list(duplicates.keys())}"
+        )

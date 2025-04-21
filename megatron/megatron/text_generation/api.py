@@ -8,35 +8,37 @@ import torch
 from megatron.core import mpu
 from .communication import broadcast_float_list
 from .generation import (
-        generate_tokens_probs_and_return_on_first_stage, 
-        generate_tokens_probs_and_return_on_first_stage_stream,
-        score_and_return_on_first_stage,
-        beam_search_and_return_on_first_stage)
-from .tokenization import (
-    tokenize_prompts,
-    detokenize_generations)
+    generate_tokens_probs_and_return_on_first_stage,
+    generate_tokens_probs_and_return_on_first_stage_stream,
+    score_and_return_on_first_stage,
+    beam_search_and_return_on_first_stage,
+)
+from .tokenization import tokenize_prompts, detokenize_generations
 
-def generate_and_post_process(model,
-                              prompts=None,
-                              tokens_to_generate=0,
-                              return_output_log_probs=False,
-                              top_k_sampling=0,
-                              top_p_sampling=0.0,
-                              top_p_decay=0.0,
-                              top_p_bound=0.0,
-                              temperature=1.0,
-                              add_BOS=False,
-                              use_eod_token_for_early_termination=True,
-                              stop_on_double_eol=False,
-                              stop_on_eol=False,
-                              prevent_newline_after_colon=False,
-                              random_seed=-1,
-                              stream=False):
+
+def generate_and_post_process(
+    model,
+    prompts=None,
+    tokens_to_generate=0,
+    return_output_log_probs=False,
+    top_k_sampling=0,
+    top_p_sampling=0.0,
+    top_p_decay=0.0,
+    top_p_bound=0.0,
+    temperature=1.0,
+    add_BOS=False,
+    use_eod_token_for_early_termination=True,
+    stop_on_double_eol=False,
+    stop_on_eol=False,
+    prevent_newline_after_colon=False,
+    random_seed=-1,
+    stream=False,
+):
     """Run inference and post-process outputs, i.e., detokenize,
     move to cpu and convert to list."""
 
     if not stream:
-    # Main inference.
+        # Main inference.
         tokens, lengths, output_log_probs = generate(
             model,
             prompts=prompts,
@@ -53,20 +55,27 @@ def generate_and_post_process(model,
             stop_on_eol=stop_on_eol,
             prevent_newline_after_colon=prevent_newline_after_colon,
             random_seed=random_seed,
-            )
+        )
 
         # Only post-process on first stage.
         if mpu.is_pipeline_first_stage():
-            tokens, prompts_plus_generations, prompts_plus_generations_segments = \
+            tokens, prompts_plus_generations, prompts_plus_generations_segments = (
                 detokenize_generations(tokens, lengths, True)
+            )
 
             if return_output_log_probs:
                 output_log_probs = output_log_probs.cpu().numpy().tolist()
-                for i, (prob, seg) in enumerate(zip(output_log_probs, prompts_plus_generations_segments)):
-                    output_log_probs[i] = prob[:len(seg)-1]
+                for i, (prob, seg) in enumerate(
+                    zip(output_log_probs, prompts_plus_generations_segments)
+                ):
+                    output_log_probs[i] = prob[: len(seg) - 1]
 
-            return prompts_plus_generations, prompts_plus_generations_segments, \
-                output_log_probs, tokens
+            return (
+                prompts_plus_generations,
+                prompts_plus_generations_segments,
+                output_log_probs,
+                tokens,
+            )
 
         return None
     else:
@@ -86,49 +95,59 @@ def generate_and_post_process(model,
             stop_on_eol=stop_on_eol,
             prevent_newline_after_colon=prevent_newline_after_colon,
             random_seed=random_seed,
-            )
+        )
 
         # Only post-process on first stage.
         if mpu.is_pipeline_first_stage():
-            print(f"device is {torch.cuda.current_device()}, stream function return is {tokens}")
+            print(
+                f"device is {torch.cuda.current_device()}, stream function return is {tokens}"
+            )
             return tokens
-          
 
         return None
 
-def generate(model,
-             prompts=None,
-             tokens_to_generate=0,
-             return_output_log_probs=False,
-             top_k_sampling=0,
-             top_p_sampling=0.0,
-             top_p_decay=0.0,
-             top_p_bound=0.0,
-             temperature=1.0,
-             add_BOS=False,
-             use_eod_token_for_early_termination=True,
-             stop_on_double_eol=False,
-             stop_on_eol=False,
-             prevent_newline_after_colon=False,
-             random_seed=-1, 
-             ):
+
+def generate(
+    model,
+    prompts=None,
+    tokens_to_generate=0,
+    return_output_log_probs=False,
+    top_k_sampling=0,
+    top_p_sampling=0.0,
+    top_p_decay=0.0,
+    top_p_bound=0.0,
+    temperature=1.0,
+    add_BOS=False,
+    use_eod_token_for_early_termination=True,
+    stop_on_double_eol=False,
+    stop_on_eol=False,
+    prevent_newline_after_colon=False,
+    random_seed=-1,
+):
     """Given prompts and input parameters, run inference and return:
-       tokens: prompts plus the generated tokens.
-       lengths: length of the prompt + generations. Note that we can
-           discard tokens in the tokens tensor that are after the
-           corresponding length.
-       output_log_probs: log probs of the tokens.
+    tokens: prompts plus the generated tokens.
+    lengths: length of the prompt + generations. Note that we can
+        discard tokens in the tokens tensor that are after the
+        corresponding length.
+    output_log_probs: log probs of the tokens.
     """
 
     # Make sure input params are avaialble to all ranks.
-    values = [tokens_to_generate,
-              return_output_log_probs,
-              top_k_sampling, top_p_sampling, top_p_decay, top_p_bound,
-              temperature, add_BOS, use_eod_token_for_early_termination,
-              stop_on_double_eol,
-              stop_on_eol,
-              prevent_newline_after_colon,
-              random_seed]
+    values = [
+        tokens_to_generate,
+        return_output_log_probs,
+        top_k_sampling,
+        top_p_sampling,
+        top_p_decay,
+        top_p_bound,
+        temperature,
+        add_BOS,
+        use_eod_token_for_early_termination,
+        stop_on_double_eol,
+        stop_on_eol,
+        prevent_newline_after_colon,
+        random_seed,
+    ]
     values_float_tensor = broadcast_float_list(len(values), float_list=values)
     tokens_to_generate = int(values_float_tensor[0].item())
     return_output_log_probs = bool(values_float_tensor[1].item())
@@ -148,18 +167,22 @@ def generate(model,
     # Note that these tensors are broadcaseted to all ranks.
     if torch.distributed.get_rank() == 0:
         assert prompts is not None
-    
+
     context_tokens_tensor, context_length_tensor = tokenize_prompts(
-        prompts=prompts, tokens_to_generate=tokens_to_generate, add_BOS=add_BOS)
+        prompts=prompts, tokens_to_generate=tokens_to_generate, add_BOS=add_BOS
+    )
 
     if tokens_to_generate == 0:
         return score_and_return_on_first_stage(
-            model, context_tokens_tensor, context_length_tensor)
-    
+            model, context_tokens_tensor, context_length_tensor
+        )
+
     # Main inference function.
     # Note that the outputs are available on the first stage.
     return generate_tokens_probs_and_return_on_first_stage(
-        model, context_tokens_tensor, context_length_tensor,
+        model,
+        context_tokens_tensor,
+        context_length_tensor,
         return_output_log_probs=return_output_log_probs,
         top_k=top_k_sampling,
         top_p=top_p_sampling,
@@ -171,41 +194,50 @@ def generate(model,
         stop_on_eol=stop_on_eol,
         prevent_newline_after_colon=prevent_newline_after_colon,
         seed=random_seed,
-        )
+    )
 
-def generate_stream(model,
-             prompts=None,
-             tokens_to_generate=0,
-             return_output_log_probs=False,
-             top_k_sampling=0,
-             top_p_sampling=0.0,
-             top_p_decay=0.0,
-             top_p_bound=0.0,
-             temperature=1.0,
-             add_BOS=False,
-             use_eod_token_for_early_termination=True,
-             stop_on_double_eol=False,
-             stop_on_eol=False,
-             prevent_newline_after_colon=False,
-             random_seed=-1, 
-             ):
+
+def generate_stream(
+    model,
+    prompts=None,
+    tokens_to_generate=0,
+    return_output_log_probs=False,
+    top_k_sampling=0,
+    top_p_sampling=0.0,
+    top_p_decay=0.0,
+    top_p_bound=0.0,
+    temperature=1.0,
+    add_BOS=False,
+    use_eod_token_for_early_termination=True,
+    stop_on_double_eol=False,
+    stop_on_eol=False,
+    prevent_newline_after_colon=False,
+    random_seed=-1,
+):
     """Given prompts and input parameters, run inference and return:
-       tokens: prompts plus the generated tokens.
-       lengths: length of the prompt + generations. Note that we can
-           discard tokens in the tokens tensor that are after the
-           corresponding length.
-       output_log_probs: log probs of the tokens.
+    tokens: prompts plus the generated tokens.
+    lengths: length of the prompt + generations. Note that we can
+        discard tokens in the tokens tensor that are after the
+        corresponding length.
+    output_log_probs: log probs of the tokens.
     """
 
     # Make sure input params are avaialble to all ranks.
-    values = [tokens_to_generate,
-              return_output_log_probs,
-              top_k_sampling, top_p_sampling, top_p_decay, top_p_bound,
-              temperature, add_BOS, use_eod_token_for_early_termination,
-              stop_on_double_eol,
-              stop_on_eol,
-              prevent_newline_after_colon,
-              random_seed]
+    values = [
+        tokens_to_generate,
+        return_output_log_probs,
+        top_k_sampling,
+        top_p_sampling,
+        top_p_decay,
+        top_p_bound,
+        temperature,
+        add_BOS,
+        use_eod_token_for_early_termination,
+        stop_on_double_eol,
+        stop_on_eol,
+        prevent_newline_after_colon,
+        random_seed,
+    ]
     values_float_tensor = broadcast_float_list(len(values), float_list=values)
     tokens_to_generate = int(values_float_tensor[0].item())
     return_output_log_probs = bool(values_float_tensor[1].item())
@@ -225,18 +257,22 @@ def generate_stream(model,
     # Note that these tensors are broadcaseted to all ranks.
     if torch.distributed.get_rank() == 0:
         assert prompts is not None
-    
+
     context_tokens_tensor, context_length_tensor = tokenize_prompts(
-        prompts=prompts, tokens_to_generate=tokens_to_generate, add_BOS=add_BOS)
+        prompts=prompts, tokens_to_generate=tokens_to_generate, add_BOS=add_BOS
+    )
 
     if tokens_to_generate == 0:
         return score_and_return_on_first_stage(
-            model, context_tokens_tensor, context_length_tensor)
-    
+            model, context_tokens_tensor, context_length_tensor
+        )
+
     # Main inference function.
     # Note that the outputs are available on the first stage.
     return generate_tokens_probs_and_return_on_first_stage_stream(
-        model, context_tokens_tensor, context_length_tensor,
+        model,
+        context_tokens_tensor,
+        context_length_tensor,
         return_output_log_probs=return_output_log_probs,
         top_k=top_k_sampling,
         top_p=top_p_sampling,
@@ -248,48 +284,70 @@ def generate_stream(model,
         stop_on_eol=stop_on_eol,
         prevent_newline_after_colon=prevent_newline_after_colon,
         seed=random_seed,
-        )
+    )
 
-def beam_search_and_post_process(model,
-                                 prompts=None,
-                                 tokens_to_generate=0,
-                                 beam_size=0,
-                                 add_BOS=False,
-                                 stop_token=50256,
-                                 num_return_gen=1,
-                                 length_penalty=1,
-                                 prevent_newline_after_colon=False):
+
+def beam_search_and_post_process(
+    model,
+    prompts=None,
+    tokens_to_generate=0,
+    beam_size=0,
+    add_BOS=False,
+    stop_token=50256,
+    num_return_gen=1,
+    length_penalty=1,
+    prevent_newline_after_colon=False,
+):
     """Run beam search and post-process outputs, i.e., detokenize,
     move to cpu and convert to list."""
 
     # Main inference.
-    tokens, scores = beam_search(model,
-                                 prompts=prompts,
-                                 tokens_to_generate=tokens_to_generate,
-                                 beam_size=beam_size,
-                                 add_BOS=add_BOS,
-                                 stop_token=stop_token,
-                                 num_return_gen=num_return_gen,
-                                 length_penalty=length_penalty,
-                                 prevent_newline_after_colon=prevent_newline_after_colon)
+    tokens, scores = beam_search(
+        model,
+        prompts=prompts,
+        tokens_to_generate=tokens_to_generate,
+        beam_size=beam_size,
+        add_BOS=add_BOS,
+        stop_token=stop_token,
+        num_return_gen=num_return_gen,
+        length_penalty=length_penalty,
+        prevent_newline_after_colon=prevent_newline_after_colon,
+    )
     # Only post-process on first stage.
     if mpu.is_pipeline_first_stage():
-        lengths = tokens.size(1)*torch.ones(beam_size, dtype=torch.int64, device=torch.cuda.current_device()) 
-        tokens, prompts_plus_generations, prompts_plus_generations_segments = detokenize_generations(tokens, lengths, True)
+        lengths = tokens.size(1) * torch.ones(
+            beam_size, dtype=torch.int64, device=torch.cuda.current_device()
+        )
+        tokens, prompts_plus_generations, prompts_plus_generations_segments = (
+            detokenize_generations(tokens, lengths, True)
+        )
         scores = scores.cpu().numpy().tolist()
         return prompts_plus_generations, prompts_plus_generations_segments, scores
 
     return None
 
-def beam_search(model, prompts=None, tokens_to_generate=0, beam_size=0, add_BOS=False, stop_token=50256, num_return_gen=1, length_penalty=1, prevent_newline_after_colon=False):
+
+def beam_search(
+    model,
+    prompts=None,
+    tokens_to_generate=0,
+    beam_size=0,
+    add_BOS=False,
+    stop_token=50256,
+    num_return_gen=1,
+    length_penalty=1,
+    prevent_newline_after_colon=False,
+):
     # Make sure input params are avaialble to all ranks.
-    values = [tokens_to_generate,
-              beam_size,
-              add_BOS,
-              stop_token,
-              num_return_gen,
-              length_penalty,
-              prevent_newline_after_colon]
+    values = [
+        tokens_to_generate,
+        beam_size,
+        add_BOS,
+        stop_token,
+        num_return_gen,
+        length_penalty,
+        prevent_newline_after_colon,
+    ]
     values_float_tensor = broadcast_float_list(len(values), float_list=values)
     tokens_to_generate = int(values_float_tensor[0].item())
     beam_size = int(values_float_tensor[1].item())
@@ -300,8 +358,16 @@ def beam_search(model, prompts=None, tokens_to_generate=0, beam_size=0, add_BOS=
     prevent_newline_after_colon = values_float_tensor[6].item()
 
     context_tokens_tensor, context_length_tensor = tokenize_prompts(
-        prompts=prompts, tokens_to_generate=tokens_to_generate, add_BOS=add_BOS)
-    
-    return beam_search_and_return_on_first_stage(model, context_tokens_tensor, context_length_tensor, 
-            beam_size, stop_token=stop_token, num_return_gen=num_return_gen, length_penalty=length_penalty,
-            prevent_newline_after_colon=prevent_newline_after_colon)
+        prompts=prompts, tokens_to_generate=tokens_to_generate, add_BOS=add_BOS
+    )
+
+    return beam_search_and_return_on_first_stage(
+        model,
+        context_tokens_tensor,
+        context_length_tensor,
+        beam_size,
+        stop_token=stop_token,
+        num_return_gen=num_return_gen,
+        length_penalty=length_penalty,
+        prevent_newline_after_colon=prevent_newline_after_colon,
+    )

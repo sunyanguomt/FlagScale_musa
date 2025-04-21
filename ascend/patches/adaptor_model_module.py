@@ -6,7 +6,9 @@ from megatron.model.module import conversion_helper
 def fp32_to_float16(val, float16_convertor):
     def half_conversion(val):
         val_typecheck = val
-        if isinstance(val_typecheck, (torch.nn.parameter.Parameter, torch.autograd.Variable)):
+        if isinstance(
+            val_typecheck, (torch.nn.parameter.Parameter, torch.autograd.Variable)
+        ):
             val_typecheck = val.data
         if val_typecheck.dtype == torch.float32:
             val = float16_convertor(val)
@@ -18,7 +20,9 @@ def fp32_to_float16(val, float16_convertor):
 def float16_to_fp32(val):
     def float_conversion(val):
         val_typecheck = val
-        if isinstance(val_typecheck, (torch.nn.parameter.Parameter, torch.autograd.Variable)):
+        if isinstance(
+            val_typecheck, (torch.nn.parameter.Parameter, torch.autograd.Variable)
+        ):
             val_typecheck = val.data
         if val_typecheck.dtype in [torch.float16, torch.bfloat16]:
             val = val.float()

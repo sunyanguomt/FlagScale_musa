@@ -40,7 +40,7 @@ def accuracy_func_provider():
         args.micro_batch_size,
         num_workers=args.num_workers,
         drop_last=(mpu.get_data_parallel_world_size() > 1),
-        shuffle=False
+        shuffle=False,
     )
 
     def metrics_func(model, epoch):
@@ -70,12 +70,12 @@ def calculate_correct_answers(model, dataloader, epoch):
         predicted = torch.argmax(logits, dim=-1)
         corrects = (predicted == labels).float()
         # Add to the counters.
-        loss_dict['total'] = labels.size(0)
-        loss_dict['correct'] = corrects.sum().item()
+        loss_dict["total"] = labels.size(0)
+        loss_dict["correct"] = corrects.sum().item()
 
         return 0, loss_dict
 
-    #defined inside to capture output_predictions
+    # defined inside to capture output_predictions
     def correct_answers_forward_step(batch, model):
         try:
             batch_ = next(batch)
@@ -94,12 +94,18 @@ def calculate_correct_answers(model, dataloader, epoch):
         correct = 0
         for _, batch in enumerate(dataloader):
 
-            loss_dicts = forward_backward_func(correct_answers_forward_step, batch, model,
-                                               optimizer=None, timers=None, forward_only=True)
+            loss_dicts = forward_backward_func(
+                correct_answers_forward_step,
+                batch,
+                model,
+                optimizer=None,
+                timers=None,
+                forward_only=True,
+            )
 
             for loss_dict in loss_dicts:
-                total += loss_dict['total']
-                correct += loss_dict['correct']
+                total += loss_dict["total"]
+                correct += loss_dict["correct"]
 
     for m in model:
         m.train()
@@ -107,8 +113,7 @@ def calculate_correct_answers(model, dataloader, epoch):
     # Reduce.
     if mpu.is_pipeline_last_stage():
         unreduced = torch.cuda.LongTensor([correct, total])
-        torch.distributed.all_reduce(unreduced,
-                                     group=mpu.get_data_parallel_group())
+        torch.distributed.all_reduce(unreduced, group=mpu.get_data_parallel_group())
 
         # Print on screen.
         correct_ans = unreduced[0].item()

@@ -16,6 +16,7 @@ from megatron.model.transformer import bias_dropout_add_fused_train
 from megatron.model.fused_bias_gelu import bias_gelu
 from megatron.utils import save_checkpoint_info
 
+
 def _compile_dependencies():
 
     args = get_args()
@@ -109,6 +110,7 @@ def set_jit_fusion_options():
         torch._C._jit_override_can_fuse_on_cpu(True)
         torch._C._jit_override_can_fuse_on_gpu(True)
 
+
 def _initialize_distributed():
     """Initialize torch.distributed and core model parallel."""
     args = get_args()
@@ -198,6 +200,7 @@ def _initialize_distributed():
                     f"{mpu.get_pipeline_model_parallel_world_size()}"
                 )
 
+
 def _set_random_seed(seed_, data_parallel_random_init=False):
     """Set random seed for reproducability."""
     if seed_ is not None and seed_ > 0:
@@ -213,6 +216,7 @@ def _set_random_seed(seed_, data_parallel_random_init=False):
             tensor_parallel.model_parallel_cuda_manual_seed(seed)
     else:
         raise ValueError("Seed ({}) should be a positive integer.".format(seed))
+
 
 def _warmup_jit_function():
     """Compilie JIT functions before the main training steps"""
@@ -262,9 +266,7 @@ def _warmup_jit_function():
         dtype=dtype,
         device="mlu",
     )
-    bias = torch.rand((args.hidden_size), dtype=dtype, device="mlu").expand_as(
-        residual
-    )
+    bias = torch.rand((args.hidden_size), dtype=dtype, device="mlu").expand_as(residual)
     dropout_rate = 0.1
     # Warmup JIT fusions with the input grad_enable state of both forward
     # prop and recomputation
@@ -279,11 +281,12 @@ def _warmup_jit_function():
     del bias, input, residual, output
     torch.mlu.empty_cache()
 
+
 megatron.initialize._compile_dependencies = _compile_dependencies
-megatron.initialize._initialize_distributed = _initialize_distributed 
-#megatron.initialize._set_random_seed = _set_random_seed 
-megatron.initialize._warmup_jit_function= _warmup_jit_function
+megatron.initialize._initialize_distributed = _initialize_distributed
+# megatron.initialize._set_random_seed = _set_random_seed
+megatron.initialize._warmup_jit_function = _warmup_jit_function
 
 for k, v in sys.modules.items():
-    if 'megatron' in k and hasattr(v, 'set_jit_fusion_options'):
-        setattr(v, 'set_jit_fusion_options', set_jit_fusion_options)
+    if "megatron" in k and hasattr(v, "set_jit_fusion_options"):
+        setattr(v, "set_jit_fusion_options", set_jit_fusion_options)

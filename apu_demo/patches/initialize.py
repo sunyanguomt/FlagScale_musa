@@ -5,13 +5,18 @@ import megatron
 from megatron import get_args
 from megatron import fused_kernels
 
+
 # Same as the original function, except for the print statement
 def _compile_dependencies():
     args = get_args()
 
     rank = torch.distributed.get_rank()
     if args.device_type:
-        print("Rank {}: === Monkey-patching _compile_dependencies on {} ===".format(rank, args.device_type))
+        print(
+            "Rank {}: === Monkey-patching _compile_dependencies on {} ===".format(
+                rank, args.device_type
+            )
+        )
     else:
         print("Rank {}: === Original _compile_dependencies ===".format(rank))
 
@@ -83,6 +88,7 @@ def _compile_dependencies():
             flush=True,
         )
 
+
 print("=== Monkey-patching initialize.py ===")
 # This is used for monkey-patching demonstration.
-megatron.initialize._compile_dependencies = _compile_dependencies 
+megatron.initialize._compile_dependencies = _compile_dependencies

@@ -10,14 +10,26 @@ import warnings
 
 from transformers import LlamaConfig, LlamaForCausalLM
 
+
 def write_json(text, path):
     with open(path, "w") as f:
         json.dump(text, f)
 
-def compute_intermediate_size(n, ffn_dim_multiplier=1, multiple_of=256):
-    return multiple_of * ((int(ffn_dim_multiplier * int(8 * n / 3)) + multiple_of - 1) // multiple_of)
 
-def convert_qkv(Wqkv, num_key_value_heads, n_heads, dim, dim_per_head, rotary_interleaved_patch=False):
+def compute_intermediate_size(n, ffn_dim_multiplier=1, multiple_of=256):
+    return multiple_of * (
+        (int(ffn_dim_multiplier * int(8 * n / 3)) + multiple_of - 1) // multiple_of
+    )
+
+
+def convert_qkv(
+    Wqkv,
+    num_key_value_heads,
+    n_heads,
+    dim,
+    dim_per_head,
+    rotary_interleaved_patch=False,
+):
     # Megatron stores Wqkv as ((nheads 3 headdim), hidden_dim)
     # while we store Wqkv as ((3 nheads headdim), hidden_dim)
     hidden_dim = dim
@@ -26,17 +38,18 @@ def convert_qkv(Wqkv, num_key_value_heads, n_heads, dim, dim_per_head, rotary_in
 
     # GQA compatible
     num_query_groups = num_key_value_heads
-    tmp =  nheads // num_query_groups
-    new_tensor_shape = (num_query_groups,
-                        tmp + 2,
-                        headdim,
-                        Wqkv.size()[-1])
-    Wq = Wqkv.view(new_tensor_shape)[:, 0:tmp        :, :]
-    Wk = Wqkv.view(new_tensor_shape)[:, tmp:tmp+1    :, :]
-    Wv = Wqkv.view(new_tensor_shape)[:, tmp+1:tmp+2, :, :]
+    tmp = nheads // num_query_groups
+    new_tensor_shape = (num_query_groups, tmp + 2, headdim, Wqkv.size()[-1])
+    Wq = Wqkv.view(new_tensor_shape)[:, 0:tmp:, :]
+    Wk = Wqkv.view(new_tensor_shape)[:, tmp : tmp + 1 :, :]
+    Wv = Wqkv.view(new_tensor_shape)[:, tmp + 1 : tmp + 2, :, :]
     if rotary_interleaved_patch:
+
         def permute(w):
-            return w.view(n_heads, 1, 2, headdim // 2, hidden_dim).transpose(3, 2)#.reshape(hidden_dim*3, hidden_dim)
+            return w.view(n_heads, 1, 2, headdim // 2, hidden_dim).transpose(
+                3, 2
+            )  # .reshape(hidden_dim*3, hidden_dim)
+
         Wv = permute(Wv)
 
     Wq = Wq.reshape(nheads * headdim, hidden_dim)
@@ -47,9 +60,10 @@ def convert_qkv(Wqkv, num_key_value_heads, n_heads, dim, dim_per_head, rotary_in
 
 
 def convert_fc1(Wfc1):
-    split_size = Wfc1.size()[0]//2
+    split_size = Wfc1.size()[0] // 2
     W1, W3 = torch.split(Wfc1, split_size)
     return W1, W3
+
 
 def convert_checkpoint(args):
     input_base_path = args.input_dir
@@ -76,13 +90,15 @@ def convert_checkpoint(args):
 
     print(f"Fetching all parameters from the checkpoint at {input_base_path}.")
     # Load unsharded weights
-    loaded = torch.load(os.path.join(input_base_path, "model_optim_rng.pt"), map_location="cpu")
+    loaded = torch.load(
+        os.path.join(input_base_path, "model_optim_rng.pt"), map_location="cpu"
+    )
 
     # Megatron weights
-    model_state_dict = loaded['model']
-    language_model_state_dict = model_state_dict['language_model']
-    embedding_state_dict = language_model_state_dict['embedding']
-    encoder_state_dict = language_model_state_dict['encoder']
+    model_state_dict = loaded["model"]
+    language_model_state_dict = model_state_dict["language_model"]
+    embedding_state_dict = language_model_state_dict["embedding"]
+    encoder_state_dict = language_model_state_dict["encoder"]
     src_norm1_name = "input_layernorm.weight"
     src_qkv_name = "self_attention.query_key_value.weight"
     src_proj_name = "self_attention.dense.weight"
@@ -92,9 +108,9 @@ def convert_checkpoint(args):
 
     # Data type
     params_dtype = torch.float
-    if args.data_type == 'bf16':
+    if args.data_type == "bf16":
         params_dtype = torch.bfloat16
-    elif args.data_type == 'fp16':
+    elif args.data_type == "fp16":
         params_dtype = torch.half
 
     param_count = 0
@@ -102,9 +118,15 @@ def convert_checkpoint(args):
     for layer_i in range(n_layers):
         filename = f"pytorch_model-{layer_i + 1}-of-{n_layers + 1}.bin"
 
-        src_prefix = 'layers.' + str(layer_i) + "."
-        Wq, Wk, Wv = convert_qkv(encoder_state_dict[src_prefix + src_qkv_name],
-                                 num_key_value_heads, n_heads, dim, dim_per_head, args.rotary_interleaved_patch)
+        src_prefix = "layers." + str(layer_i) + "."
+        Wq, Wk, Wv = convert_qkv(
+            encoder_state_dict[src_prefix + src_qkv_name],
+            num_key_value_heads,
+            n_heads,
+            dim,
+            dim_per_head,
+            args.rotary_interleaved_patch,
+        )
         Wo = encoder_state_dict[src_prefix + src_proj_name]
         W1, W3 = convert_fc1(encoder_state_dict[src_prefix + src_fc1_name])
         W2 = encoder_state_dict[src_prefix + src_fc2_name]
@@ -126,7 +148,9 @@ def convert_checkpoint(args):
             f"model.layers.{layer_i}.mlp.down_proj.weight": W2.to(params_dtype),
             f"model.layers.{layer_i}.mlp.up_proj.weight": W3.to(params_dtype),
             f"model.layers.{layer_i}.input_layernorm.weight": norm1.to(params_dtype),
-            f"model.layers.{layer_i}.post_attention_layernorm.weight": norm2.to(params_dtype),
+            f"model.layers.{layer_i}.post_attention_layernorm.weight": norm2.to(
+                params_dtype
+            ),
         }
 
         state_dict[f"model.layers.{layer_i}.self_attn.rotary_emb.inv_freq"] = inv_freq
@@ -137,9 +161,13 @@ def convert_checkpoint(args):
         print(f"[INFO] Layer {layer_i} is converted.")
 
     filename = f"pytorch_model-{n_layers + 1}-of-{n_layers + 1}.bin"
-    word_embeddings = embedding_state_dict['word_embeddings']['weight'][:args.true_vocab_size,:]
-    ln_f = encoder_state_dict['final_layernorm.weight']
-    lm_head = language_model_state_dict['output_layer']['weight'][:args.true_vocab_size,:]
+    word_embeddings = embedding_state_dict["word_embeddings"]["weight"][
+        : args.true_vocab_size, :
+    ]
+    ln_f = encoder_state_dict["final_layernorm.weight"]
+    lm_head = language_model_state_dict["output_layer"]["weight"][
+        : args.true_vocab_size, :
+    ]
     state_dict = {
         "model.embed_tokens.weight": word_embeddings.to(params_dtype),
         "model.norm.weight": ln_f.to(params_dtype),
@@ -159,7 +187,9 @@ def convert_checkpoint(args):
     multiple_of = args.multiple_of
     config = LlamaConfig(
         hidden_size=dim,
-        intermediate_size=compute_intermediate_size(dim, ffn_dim_multiplier, multiple_of),
+        intermediate_size=compute_intermediate_size(
+            dim, ffn_dim_multiplier, multiple_of
+        ),
         num_attention_heads=n_heads,
         num_hidden_layers=n_layers,
         rms_norm_eps=args.layernorm_epsilon,
@@ -177,7 +207,9 @@ def convert_checkpoint(args):
     gc.collect()
 
     print("Loading the checkpoint.")
-    model = LlamaForCausalLM.from_pretrained(tmp_model_path, low_cpu_mem_usage=True, torch_dtype=params_dtype)
+    model = LlamaForCausalLM.from_pretrained(
+        tmp_model_path, low_cpu_mem_usage=True, torch_dtype=params_dtype
+    )
     # Avoid saving this as part of the config.
     del model.config._name_or_path
 
@@ -185,83 +217,87 @@ def convert_checkpoint(args):
     model.save_pretrained(model_path, safe_serialization=safe_serialization)
     shutil.rmtree(tmp_model_path)
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--input-dir", "-input_dir", "-i",
-        help="folder name of input files", required=True
+        "--input-dir",
+        "-input_dir",
+        "-i",
+        help="folder name of input files",
+        required=True,
     )
     parser.add_argument(
-        "--output-dir", "-output_dir", "-o",
-        help="folder name of output files", required=True
+        "--output-dir",
+        "-output_dir",
+        "-o",
+        help="folder name of output files",
+        required=True,
     )
     parser.add_argument(
-        '--seq-length', type=int, default=4096,
-        help='Maximum sequence length to process.'
-    )
-    parser.add_argument(
-        "--num-layers",
+        "--seq-length",
         type=int,
-        help="The number of transformer layers"
+        default=4096,
+        help="Maximum sequence length to process.",
     )
     parser.add_argument(
-        "--hidden-size",
-        type=int,
-        help="The number of hidden size"
+        "--num-layers", type=int, help="The number of transformer layers"
+    )
+    parser.add_argument("--hidden-size", type=int, help="The number of hidden size")
+    parser.add_argument(
+        "--num-attention-heads", type=int, help="The number of attention heads"
     )
     parser.add_argument(
-        "--num-attention-heads",
-        type=int,
-        help="The number of attention heads"
+        "--group-query-attention",
+        action="store_true",
+        help="Use group-query attention.",
     )
+    parser.add_argument("--num-query-groups", type=int, default=8)
     parser.add_argument(
-        '--group-query-attention',
-        action='store_true',
-        help='Use group-query attention.'
-    )
-    parser.add_argument(
-        '--num-query-groups',
-        type=int,
-        default=8
-    )
-    parser.add_argument(
-        "--data-type", "-data_type", "-d",
+        "--data-type",
+        "-data_type",
+        "-d",
         choices=["bf16", "fp32", "fp16"],
-        default="fp32", help=" data type of the parameters"
+        default="fp32",
+        help=" data type of the parameters",
     )
     parser.add_argument(
-        '--multiple-of', type=int, default=None,
-        help='Multiplier for setting Feed-Forward Network hidden size when swiglu.'
+        "--multiple-of",
+        type=int,
+        default=None,
+        help="Multiplier for setting Feed-Forward Network hidden size when swiglu.",
     )
     parser.add_argument(
-        '--hidden-dim-multiplier', type=float, default=None,
-        help='Custom Multiplier for setting Feed-Forward Network hidden dim when swiglu.'
+        "--hidden-dim-multiplier",
+        type=float,
+        default=None,
+        help="Custom Multiplier for setting Feed-Forward Network hidden dim when swiglu.",
     )
     parser.add_argument(
-        '--layernorm-epsilon', type=float, default=1e-5,
-        help='Layer norm epsilon.'
+        "--layernorm-epsilon", type=float, default=1e-5, help="Layer norm epsilon."
     )
     parser.add_argument(
-        '--true-vocab-size', type=int, default=100008,
-        help='original size of vocab, if specified will trim padding from embedding table.'
+        "--true-vocab-size",
+        type=int,
+        default=100008,
+        help="original size of vocab, if specified will trim padding from embedding table.",
     )
     parser.add_argument(
-        '--bos-token-id', type=int, default=100006,
-        help='bos-token-id.'
+        "--bos-token-id", type=int, default=100006, help="bos-token-id."
     )
     parser.add_argument(
-        '--eos-token-id', type=int, default=100006,
-        help='eos-token-id.'
+        "--eos-token-id", type=int, default=100006, help="eos-token-id."
     )
     parser.add_argument(
-        "--safe-serialization", type=bool,
-        help="Whether or not to save using `safetensors`."
+        "--safe-serialization",
+        type=bool,
+        help="Whether or not to save using `safetensors`.",
     )
     parser.add_argument(
-        '--rotary-interleaved-patch', action='store_true',
-        help='Patch for loading models using interleaved rotary position embeddings.'
+        "--rotary-interleaved-patch",
+        action="store_true",
+        help="Patch for loading models using interleaved rotary position embeddings.",
     )
-
 
     args = parser.parse_args()
     print("\n=============== Argument ===============")

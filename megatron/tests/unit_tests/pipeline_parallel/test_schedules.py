@@ -2,26 +2,46 @@ import torch
 from tests.unit_tests.test_utilities import Utils
 from megatron.core import ModelParallelConfig
 import megatron.core.pipeline_parallel.schedules as schedule
-from pytest_mock import mocker 
+from pytest_mock import mocker
 import pytest
 
 rank = Utils.rank
- 
+
+
 def test_get_forward_backward_func():
-    Utils.initialize_model_parallel(tensor_model_parallel_size=2, pipeline_model_parallel_size=1)
-    assert(schedule.get_forward_backward_func() == schedule.forward_backward_no_pipelining)
+    Utils.initialize_model_parallel(
+        tensor_model_parallel_size=2, pipeline_model_parallel_size=1
+    )
+    assert (
+        schedule.get_forward_backward_func() == schedule.forward_backward_no_pipelining
+    )
     Utils.destroy_model_parallel()
-    Utils.initialize_model_parallel(tensor_model_parallel_size=2, pipeline_model_parallel_size=4)
-    assert(schedule.get_forward_backward_func() == schedule.forward_backward_pipelining_without_interleaving)
+    Utils.initialize_model_parallel(
+        tensor_model_parallel_size=2, pipeline_model_parallel_size=4
+    )
+    assert (
+        schedule.get_forward_backward_func()
+        == schedule.forward_backward_pipelining_without_interleaving
+    )
     Utils.destroy_model_parallel()
-    Utils.initialize_model_parallel(tensor_model_parallel_size=2, pipeline_model_parallel_size=4, virtual_pipeline_model_parallel_size=2)
-    assert(schedule.get_forward_backward_func() == schedule.forward_backward_pipelining_with_interleaving)
+    Utils.initialize_model_parallel(
+        tensor_model_parallel_size=2,
+        pipeline_model_parallel_size=4,
+        virtual_pipeline_model_parallel_size=2,
+    )
+    assert (
+        schedule.get_forward_backward_func()
+        == schedule.forward_backward_pipelining_with_interleaving
+    )
     Utils.destroy_model_parallel()
+
 
 def test_deallocate_output_tensor():
     out = torch.tensor([[1, 2, 3], [4, 5, 6]])
     schedule.deallocate_output_tensor(out)
-    assert(out.nelement() == 6) 
+    assert out.nelement() == 6
+
+
 """ 
 def test_forward_backward_func_without_pipeline_parallel(mocker):
     from megatron.core.pipeline_parallel import get_forward_backward_func

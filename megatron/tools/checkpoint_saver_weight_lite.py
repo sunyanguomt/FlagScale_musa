@@ -1,6 +1,7 @@
 """
 This script is based on Megatron's checkpoint_saver_megatron.py, but it only saves the model ckpt without build the model.
 """
+
 import argparse
 from collections.abc import Mapping
 from collections import OrderedDict
@@ -38,6 +39,7 @@ def add_arguments(parser):
         help="Target tensor model parallel size, default to the pipeline parall size "
         "in the input checkpoint if provided by the loader, otherwise to 1",
     )
+
 
 def save_checkpoint(queue, args):
     # Search in directory above this
@@ -117,9 +119,9 @@ def save_checkpoint(queue, args):
         args.target_tensor_parallel_size is not None
         and args.target_pipeline_parallel_size is not None
     ):
-        os.environ[
-            "WORLD_SIZE"
-        ] = f"{args.target_tensor_parallel_size * args.target_pipeline_parallel_size}"
+        os.environ["WORLD_SIZE"] = (
+            f"{args.target_tensor_parallel_size * args.target_pipeline_parallel_size}"
+        )
     # We want all arguments to come from us
     sys.argv = [
         "script.py",
@@ -264,6 +266,7 @@ def save_checkpoint(queue, args):
     assert margs.pipeline_model_parallel_size == pp_size
 
     model_ckpts = [[None for _ in range(pp_size)] for _ in range(tp_size)]
+
     def get_model_ckpt(model_ckpts, tp_rank, pp_rank, vp_size, vp_rank):
         if vp_size > 1:
             model_key = "model" + str(vp_rank)
@@ -369,13 +372,14 @@ def save_checkpoint(queue, args):
             print("[WARNING]: unrecognized key: " + key)
 
     def set_optimizer_info(model_ckpt, optimizer, opt_param_scheduler, args):
-        model_ckpt['optimizer'] = optimizer
-        model_ckpt['opt_param_scheduler'] = opt_param_scheduler
-        model_ckpt['iteration'] = args.iteration
-        model_ckpt['checkpoint_version'] = 3.0
-        model_ckpt['args'] = args 
+        model_ckpt["optimizer"] = optimizer
+        model_ckpt["opt_param_scheduler"] = opt_param_scheduler
+        model_ckpt["iteration"] = args.iteration
+        model_ckpt["checkpoint_version"] = 3.0
+        model_ckpt["args"] = args
 
     model_ckpt_paths = get_model_ckpt_paths(margs.save, tp_size, pp_size, md.iteration)
+
     def save_model_ckpt(model_ckpts, model_ckpt_paths, tp_rank, pp_rank):
         if model_ckpts[tp_rank][pp_rank] is not None:
             model_ckpt_path = model_ckpt_paths[tp_rank][pp_rank]
@@ -389,13 +393,15 @@ def save_checkpoint(queue, args):
             del model_ckpt
         else:
             raise Exception("model ckpt is None")
-    
+
     def padding_vocab(orig_word_embed):
         # Deal with padding
         if md.true_vocab_size is not None:
             # figure out what our padded vocab size is
             orig_vocab_size = orig_word_embed.shape[0]
-            margs.padded_vocab_size = _vocab_size_with_padding(md.true_vocab_size, margs)
+            margs.padded_vocab_size = _vocab_size_with_padding(
+                md.true_vocab_size, margs
+            )
 
             # Cut out extra padding we don't need
             if orig_vocab_size > margs.padded_vocab_size:
@@ -456,8 +462,9 @@ def save_checkpoint(queue, args):
         # For later pipeline parallel ranks, make the new models
         if pp_rank > 0:
             post_process = pp_rank == args.target_pipeline_parallel_size - 1
-        num_layers = get_num_layers_from_args(md.num_layers, pp_size, pp_rank,
-                                              margs.hetero_pipeline_stages)
+        num_layers = get_num_layers_from_args(
+            md.num_layers, pp_size, pp_rank, margs.hetero_pipeline_stages
+        )
         for layer in range(num_layers):
             # weight
             msg = queue_get(f"transformer layer {total_layer_num}")
@@ -689,7 +696,9 @@ def save_checkpoint(queue, args):
                 print("ERROR: got some more data but was expecting to be done")
 
         for tp_rank in range(args.target_tensor_parallel_size):
-            set_optimizer_info(model_ckpts[tp_rank][pp_rank], optimizer, opt_param_scheduler, margs)
+            set_optimizer_info(
+                model_ckpts[tp_rank][pp_rank], optimizer, opt_param_scheduler, margs
+            )
             save_model_ckpt(model_ckpts, model_ckpt_paths, tp_rank, pp_rank)
             print("Saved weight for tp_rank {} and pp_rank {}".format(tp_rank, pp_rank))
 

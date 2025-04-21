@@ -13,4 +13,6 @@ try:
     from .tensorstore import _import_trigger
     from .zarr import _import_trigger
 except ImportError:
-    logger.warning('Zarr-based strategies will not be registered because of missing packages')
+    logger.warning(
+        "Zarr-based strategies will not be registered because of missing packages"
+    )

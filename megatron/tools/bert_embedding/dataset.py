@@ -8,7 +8,7 @@ from megatron.data.bert_dataset import build_training_sample
 
 
 class BertEmbeddingDataset(torch.utils.data.Dataset):
-    '''Dataset to convert a text dataset to Bert tokens.'''
+    """Dataset to convert a text dataset to Bert tokens."""
 
     def __init__(self, text_dataset, max_seq_length):
 
@@ -45,9 +45,9 @@ class BertEmbeddingDataset(torch.utils.data.Dataset):
 
         # Bert/Wordpiece tokens (+truncate).
         bert_token_ids = self.bert_tokenizer.tokenize(text)
-        bert_token_ids = bert_token_ids[:self.max_seq_length - 2] # cls+sep.
+        bert_token_ids = bert_token_ids[: self.max_seq_length - 2]  # cls+sep.
         if not bert_token_ids:
-            bert_token_ids = [ self.bert_tokenizer.pad_id ] # hack when empty seq
+            bert_token_ids = [self.bert_tokenizer.pad_id]  # hack when empty seq
 
         # Note that this rng state should be numpy and not python since
         # python randint is inclusive whereas the numpy one is exclusive.
@@ -55,14 +55,19 @@ class BertEmbeddingDataset(torch.utils.data.Dataset):
         np_rng = np.random.RandomState(seed=((self.seed + idx) % 2**32))
 
         # Build sample.
-        sample = build_training_sample([bert_token_ids],
-                                       len(bert_token_ids),
-                                       len(bert_token_ids) + 2, # for cls+sep
-                                       self.vocab_id_list,
-                                       self.vocab_id_to_token_dict,
-                                       self.cls_id, self.sep_id,
-                                       self.mask_id, self.pad_id,
-                                       self.masked_lm_prob, np_rng,
-                                       binary_head=False)
+        sample = build_training_sample(
+            [bert_token_ids],
+            len(bert_token_ids),
+            len(bert_token_ids) + 2,  # for cls+sep
+            self.vocab_id_list,
+            self.vocab_id_to_token_dict,
+            self.cls_id,
+            self.sep_id,
+            self.mask_id,
+            self.pad_id,
+            self.masked_lm_prob,
+            np_rng,
+            binary_head=False,
+        )
         sample["seq_length"] = len(sample["text"])
         return sample

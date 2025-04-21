@@ -5,23 +5,37 @@ import types
 
 import torch
 
-def add_arguments(parser):
-    group = parser.add_argument_group(title='Megatron loader')
 
-    group.add_argument('--true-vocab-size', type=int, default=None,
-                       help='original size of vocab, if specified will trim padding from embedding table.')
-    group.add_argument('--vocab-file', type=str, default=None,
-                       help='Path to the vocab file. If specified will use this to get vocab size and '
-                       'trim padding from the embedding table.')
-    group.add_argument('--megatron-path', type=str, default=None,
-                       help='Base directory of deepspeed repository')
+def add_arguments(parser):
+    group = parser.add_argument_group(title="Megatron loader")
+
+    group.add_argument(
+        "--true-vocab-size",
+        type=int,
+        default=None,
+        help="original size of vocab, if specified will trim padding from embedding table.",
+    )
+    group.add_argument(
+        "--vocab-file",
+        type=str,
+        default=None,
+        help="Path to the vocab file. If specified will use this to get vocab size and "
+        "trim padding from the embedding table.",
+    )
+    group.add_argument(
+        "--megatron-path",
+        type=str,
+        default=None,
+        help="Base directory of deepspeed repository",
+    )
+
 
 def _load_checkpoint(queue, args):
 
     # Search in directory above this
-    sys.path.append(os.path.abspath(
-        os.path.join(os.path.dirname(__file__),
-                     os.path.pardir)))
+    sys.path.append(
+        os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir))
+    )
     if args.megatron_path is not None:
         sys.path.insert(0, args.megatron_path)
 
@@ -34,32 +48,39 @@ def _load_checkpoint(queue, args):
         from megatron.core.enums import ModelType
         from megatron import fused_kernels
     except ModuleNotFoundError:
-        print("Unable to import Megatron, please specify the path to Megatron using --megatron-path. Exiting.")
+        print(
+            "Unable to import Megatron, please specify the path to Megatron using --megatron-path. Exiting."
+        )
         queue.put("exit")
         exit(1)
 
     # We want all arguments to come from us
-    sys.argv = ['script.py',
-                '--no-masked-softmax-fusion',
-                '--no-bias-gelu-fusion',
-                '--no-bias-dropout-fusion',
-                '--no-async-tensor-model-parallel-allreduce',
-                '--use-cpu-initialization',
-                '--micro-batch-size', '1',
-                '--no-load-optim',
-                '--no-load-rng',
-                '--no-save-optim',
-                '--no-save-rng',
-                '--no-initialization',
-                '--load', args.load_dir
-                ]
+    sys.argv = [
+        "script.py",
+        "--no-masked-softmax-fusion",
+        "--no-bias-gelu-fusion",
+        "--no-bias-dropout-fusion",
+        "--no-async-tensor-model-parallel-allreduce",
+        "--use-cpu-initialization",
+        "--micro-batch-size",
+        "1",
+        "--no-load-optim",
+        "--no-load-rng",
+        "--no-save-optim",
+        "--no-save-rng",
+        "--no-initialization",
+        "--load",
+        args.load_dir,
+    ]
 
     margs = parse_args()
     margs, checkpoint_args = load_args_from_checkpoint(margs)
 
     # Arguments do sanity checks on the world size, but we don't care,
     # so trick it into thinking we are plenty of processes
-    margs.world_size = margs.tensor_model_parallel_size * margs.pipeline_model_parallel_size
+    margs.world_size = (
+        margs.tensor_model_parallel_size * margs.pipeline_model_parallel_size
+    )
 
     margs = validate_args(margs)
 
@@ -73,36 +94,39 @@ def _load_checkpoint(queue, args):
                 queue.put("exit")
                 exit(1)
 
-    check_for_arg('tensor_model_parallel_size')
-    check_for_arg('pipeline_model_parallel_size')
-    check_for_arg('num_layers')
-    check_for_arg('hidden_size')
-    check_for_arg('seq_length')
-    check_for_arg('num_attention_heads')
-    check_for_arg('max_position_embeddings')
-    check_for_arg('position_embedding_type')
-    check_for_arg('tokenizer_type')
-    check_for_arg('iteration')
-    check_for_arg('bert_binary_head')
-    check_for_arg('disable_bias_linear', False)
-    check_for_arg('params_dtype')
-    check_for_arg('swiglu', False)
+    check_for_arg("tensor_model_parallel_size")
+    check_for_arg("pipeline_model_parallel_size")
+    check_for_arg("num_layers")
+    check_for_arg("hidden_size")
+    check_for_arg("seq_length")
+    check_for_arg("num_attention_heads")
+    check_for_arg("max_position_embeddings")
+    check_for_arg("position_embedding_type")
+    check_for_arg("tokenizer_type")
+    check_for_arg("iteration")
+    check_for_arg("bert_binary_head")
+    check_for_arg("disable_bias_linear", False)
+    check_for_arg("params_dtype")
+    check_for_arg("swiglu", False)
 
     # Determine how to make our models
-    if args.model_type == 'GPT':
+    if args.model_type == "GPT":
         from pretrain_gpt import model_provider
+
         margs.model_type = ModelType.encoder_or_decoder
-    elif args.model_type == 'BERT':
+    elif args.model_type == "BERT":
         from pretrain_bert import model_provider
+
         margs.model_type = ModelType.encoder_or_decoder
     else:
-        raise Exception(f'unrecognized model type: {args.model_type}')
+        raise Exception(f"unrecognized model type: {args.model_type}")
 
     # supress warning about torch.distributed not being initialized
     module.MegatronModule.embedding_warning_printed = True
 
     consumed_train_samples = None
     consumed_valid_samples = None
+
     def get_models(count, dtype):
         nonlocal consumed_train_samples
         nonlocal consumed_valid_samples
@@ -122,8 +146,7 @@ def _load_checkpoint(queue, args):
                     pre_process = mpu.is_pipeline_first_stage()
                     post_process = mpu.is_pipeline_last_stage()
                     this_model = model_provider(
-                        pre_process=pre_process,
-                        post_process=post_process
+                        pre_process=pre_process, post_process=post_process
                     ).to(dtype)
                     model_.append(this_model)
             else:
@@ -136,11 +159,11 @@ def _load_checkpoint(queue, args):
             load_checkpoint(model_, None, None)
 
             if consumed_train_samples is not None:
-                assert(margs.consumed_train_samples == consumed_train_samples)
+                assert margs.consumed_train_samples == consumed_train_samples
             else:
                 consumed_train_samples = margs.consumed_train_samples
             if consumed_valid_samples is not None:
-                assert(margs.consumed_valid_samples == consumed_valid_samples)
+                assert margs.consumed_valid_samples == consumed_valid_samples
             else:
                 consumed_valid_samples = margs.consumed_valid_samples
             for vp_rank in range(model_array_len):
@@ -150,7 +173,9 @@ def _load_checkpoint(queue, args):
     set_global_variables(margs, build_tokenizer=False)
     mpu.set_tensor_model_parallel_world_size(margs.tensor_model_parallel_size)
     mpu.set_pipeline_model_parallel_world_size(margs.pipeline_model_parallel_size)
-    mpu.set_virtual_pipeline_model_parallel_world_size(margs.virtual_pipeline_model_parallel_size)
+    mpu.set_virtual_pipeline_model_parallel_world_size(
+        margs.virtual_pipeline_model_parallel_size
+    )
     fused_kernels.load(margs)
 
     # Get true (non-padded) vocab size
@@ -160,7 +185,9 @@ def _load_checkpoint(queue, args):
         vocab = json.load(open(args.vocab_file))
         true_vocab_size = len(vocab)
         if args.true_vocab_size is not None and true_vocab_size != args.true_vocab_size:
-            print("Both --true-vocab-size and --vocab-file specified and the vocab size does not match, aborting.")
+            print(
+                "Both --true-vocab-size and --vocab-file specified and the vocab size does not match, aborting."
+            )
             queue.put("exit")
             exit(1)
     else:
@@ -213,13 +240,19 @@ def _load_checkpoint(queue, args):
     # Send embeddings
     message = {
         "word embeddings": torch.cat(
-            [models[tp_rank].language_model.embedding.word_embeddings.weight.data for tp_rank in range(tp_size)],
-            dim = 0)
+            [
+                models[tp_rank].language_model.embedding.word_embeddings.weight.data
+                for tp_rank in range(tp_size)
+            ],
+            dim=0,
+        )
     }
-    if md.position_embedding_type == 'learned_absolute':
-        message["position embeddings"] = models[0].language_model.embedding.position_embeddings.weight.data
+    if md.position_embedding_type == "learned_absolute":
+        message["position embeddings"] = models[
+            0
+        ].language_model.embedding.position_embeddings.weight.data
     else:
-        assert not hasattr(models[0].language_model.embedding, 'position_embeddings')
+        assert not hasattr(models[0].language_model.embedding, "position_embeddings")
 
     queue_put("embeddings", message)
 
@@ -240,9 +273,13 @@ def _load_checkpoint(queue, args):
                 message["input layernorm weight"] = layer.input_layernorm.weight.data
                 if not md.apply_layernorm_rms:
                     message["input layernorm bias"] = layer.input_layernorm.bias.data
-                message["post layernorm weight"] = layer.post_attention_layernorm.weight.data
+                message["post layernorm weight"] = (
+                    layer.post_attention_layernorm.weight.data
+                )
                 if not md.apply_layernorm_rms:
-                    message["post layernorm bias"] = layer.post_attention_layernorm.bias.data
+                    message["post layernorm bias"] = (
+                        layer.post_attention_layernorm.bias.data
+                    )
                 if md.linear_bias:
                     message["dense bias"] = layer.self_attention.dense.bias.data
                     message["mlp l1 bias"] = layer.mlp.dense_4h_to_h.bias.data
@@ -268,9 +305,15 @@ def _load_checkpoint(queue, args):
                 if md.swiglu:
                     # concat all the first halves ('W's) and all the second halves ('V's)
                     for tp_rank in range(tp_size):
-                        mlp_l0_weight[tp_rank] = torch.chunk(mlp_l0_weight[tp_rank], 2, dim=0)
-                    message["mlp l0 weight W"] = torch.cat([w[0] for w in mlp_l0_weight], dim=0)
-                    message["mlp l0 weight V"] = torch.cat([w[1] for w in mlp_l0_weight], dim=0)
+                        mlp_l0_weight[tp_rank] = torch.chunk(
+                            mlp_l0_weight[tp_rank], 2, dim=0
+                        )
+                    message["mlp l0 weight W"] = torch.cat(
+                        [w[0] for w in mlp_l0_weight], dim=0
+                    )
+                    message["mlp l0 weight V"] = torch.cat(
+                        [w[1] for w in mlp_l0_weight], dim=0
+                    )
                 else:
                     message["mlp l0 weight"] = torch.cat(mlp_l0_weight, dim=0)
 
@@ -282,9 +325,15 @@ def _load_checkpoint(queue, args):
                     message["qkv bias"] = torch.cat(qkv_bias, dim=0)
                     if md.swiglu:
                         for tp_rank in range(tp_size):
-                            mlp_l0_bias[tp_rank] = torch.chunk(mlp_l0_bias[tp_rank], 2, dim=0)
-                        message["mlp l0 bias W"] = torch.cat([b[0] for b in mlp_l0_bias],dim=0)
-                        message["mlp l0 bias V"] = torch.cat([b[1] for b in mlp_l0_bias],dim=0)
+                            mlp_l0_bias[tp_rank] = torch.chunk(
+                                mlp_l0_bias[tp_rank], 2, dim=0
+                            )
+                        message["mlp l0 bias W"] = torch.cat(
+                            [b[0] for b in mlp_l0_bias], dim=0
+                        )
+                        message["mlp l0 bias V"] = torch.cat(
+                            [b[1] for b in mlp_l0_bias], dim=0
+                        )
                     else:
                         message["mlp l0 bias"] = torch.cat(mlp_l0_bias, dim=0)
 
@@ -296,7 +345,7 @@ def _load_checkpoint(queue, args):
     if not md.apply_layernorm_rms:
         message = {
             "weight": models[0].language_model.encoder.final_layernorm.weight.data,
-            "bias": models[0].language_model.encoder.final_layernorm.bias.data
+            "bias": models[0].language_model.encoder.final_layernorm.bias.data,
         }
     else:
         message = {
@@ -307,17 +356,20 @@ def _load_checkpoint(queue, args):
     if md.output_layer:
         message = {
             "weight": torch.cat(
-                [models[tp_rank].language_model.output_layer.weight.data for tp_rank in range(tp_size)],
-                dim = 0)
+                [
+                    models[tp_rank].language_model.output_layer.weight.data
+                    for tp_rank in range(tp_size)
+                ],
+                dim=0,
+            )
         }
         queue_put("output layer", message)
 
-
     # Send BERT lm head and binary head if it exists
-    if md.model_type == 'BERT':
+    if md.model_type == "BERT":
         message = {
             "weight": models[0].language_model.pooler.dense.weight.data,
-            "bias": models[0].language_model.pooler.dense.bias.data
+            "bias": models[0].language_model.pooler.dense.bias.data,
         }
         queue_put("pooler", message)
 
@@ -326,7 +378,7 @@ def _load_checkpoint(queue, args):
                 "dense weight": models[0].lm_head.dense.weight.data,
                 "dense bias": models[0].lm_head.dense.bias.data,
                 "layernorm weight": models[0].lm_head.layernorm.weight.data,
-                "layernorm bias": models[0].lm_head.layernorm.bias.data
+                "layernorm bias": models[0].lm_head.layernorm.bias.data,
             }
         else:
             message = {
@@ -339,10 +391,11 @@ def _load_checkpoint(queue, args):
         if md.bert_binary_head:
             message = {
                 "weight": models[0].binary_head.weight.data,
-                "bias": models[0].binary_head.bias.data
+                "bias": models[0].binary_head.bias.data,
             }
             queue_put("binary head", message)
     queue.put("done")
+
 
 def load_checkpoint(queue, args):
     try:

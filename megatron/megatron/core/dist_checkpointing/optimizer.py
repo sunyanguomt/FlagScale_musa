@@ -17,7 +17,9 @@ from .mapping import LocalNonpersitentObject, ShardedStateDict, ShardedTensor, S
 from .utils import extract_sharded_tensors
 
 
-def get_optim_param_to_id_map(optim_params_iter: Iterable[torch.nn.Parameter]) -> Dict[int, int]:
+def get_optim_param_to_id_map(
+    optim_params_iter: Iterable[torch.nn.Parameter],
+) -> Dict[int, int]:
     param_mappings = {}
     for i, param in enumerate(optim_params_iter):
         if id(param) not in param_mappings:
@@ -26,7 +28,8 @@ def get_optim_param_to_id_map(optim_params_iter: Iterable[torch.nn.Parameter]) -
 
 
 def get_param_id_to_sharded_param_map(
-    model_sharded_state_dict: ShardedStateDict, optim_params_iter: Iterable[torch.nn.Parameter]
+    model_sharded_state_dict: ShardedStateDict,
+    optim_params_iter: Iterable[torch.nn.Parameter],
 ) -> Dict[int, ShardedTensor]:
     model_sharded_state_dict, _ = extract_sharded_tensors(model_sharded_state_dict)
     id_to_sharded_param_map = {}
@@ -35,7 +38,7 @@ def get_param_id_to_sharded_param_map(
         if id(ten.data) in param_to_id_map:
             id_to_sharded_param_map[param_to_id_map[id(ten.data)]] = ten
         else:
-            logger.debug(f'{ten} is not tracked by the optimizer')
+            logger.debug(f"{ten} is not tracked by the optimizer")
 
     if not id_to_sharded_param_map:
         logger.warning(
@@ -51,9 +54,12 @@ def make_sharded_optimizer_tensor(
 ) -> ShardedTensor:
     assert (
         tuple(optim_param.shape) == model_param.local_shape
-    ), f'Optimizer shape ({tuple(optim_param.shape)} does not match model shape ({model_param.local_shape})'
+    ), f"Optimizer shape ({tuple(optim_param.shape)} does not match model shape ({model_param.local_shape})"
     return replace(
-        model_param, key=f'{prefix}.{model_param.key}', data=optim_param, dtype=optim_param.dtype
+        model_param,
+        key=f"{prefix}.{model_param.key}",
+        data=optim_param,
+        dtype=optim_param.dtype,
     )
 
 
@@ -61,17 +67,21 @@ def optim_state_to_sharding_state(
     optim_state_dict: StateDict, id_to_sharded_param_map: Dict[int, ShardedTensor]
 ):
     sharded_state = {}
-    for param_id, param_state in optim_state_dict['state'].items():
+    for param_id, param_state in optim_state_dict["state"].items():
         sharded_state[param_id] = {}
         for state_key, param in param_state.items():
             if param_id in id_to_sharded_param_map:
                 sharded_state[param_id][state_key] = make_sharded_optimizer_tensor(
-                    id_to_sharded_param_map[param_id], param, prefix=f'optimizer.state.{state_key}'
+                    id_to_sharded_param_map[param_id],
+                    param,
+                    prefix=f"optimizer.state.{state_key}",
                 )
             else:
-                raise ValueError(f'Param id {param_id} does not match any model sharded param')
+                raise ValueError(
+                    f"Param id {param_id} does not match any model sharded param"
+                )
 
-    optim_state_dict['param_groups'] = deepcopy(optim_state_dict['param_groups'])
-    for group in optim_state_dict['param_groups']:
-        group['params'] = LocalNonpersitentObject(group['params'])
-    optim_state_dict['state'] = sharded_state
+    optim_state_dict["param_groups"] = deepcopy(optim_state_dict["param_groups"])
+    for group in optim_state_dict["param_groups"]:
+        group["params"] = LocalNonpersitentObject(group["params"])
+    optim_state_dict["state"] = sharded_state

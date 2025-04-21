@@ -1,17 +1,16 @@
-
 import argparse
-import os 
+import os
 
 parser = argparse.ArgumentParser(
-        prog='34b-base-server',
-    )
+    prog="34b-base-server",
+)
 
-parser.add_argument('--server-port', required=True, type=int)
-parser.add_argument('--master-process', required=True, type=int)
-parser.add_argument('--device', default='0', type=str)
-parser.add_argument('--iteration', required=False, type=int, default=-1)
-parser.add_argument('--checkpoint-path', required=True, type=str)
-parser.add_argument('--model-info', required=True, type=str)
+parser.add_argument("--server-port", required=True, type=int)
+parser.add_argument("--master-process", required=True, type=int)
+parser.add_argument("--device", default="0", type=str)
+parser.add_argument("--iteration", required=False, type=int, default=-1)
+parser.add_argument("--checkpoint-path", required=True, type=str)
+parser.add_argument("--model-info", required=True, type=str)
 
 args = parser.parse_args()
 
@@ -23,7 +22,9 @@ checkpoint_path = args.checkpoint_path
 model_info = args.model_info
 
 if model_iteration != -1:
-    with open(os.path.join(checkpoint_path, "latest_checkpointed_iteration.txt"), "w") as f:
+    with open(
+        os.path.join(checkpoint_path, "latest_checkpointed_iteration.txt"), "w"
+    ) as f:
         f.write(str(model_iteration))
 
 sh_content = """#!/bin/bash
@@ -91,7 +92,7 @@ with open(sh_filename, "w") as f:
     sh_content = sh_content.replace("{device_number}", "'" + device_number + "'")
     sh_content = sh_content.replace("{server_port}", str(server_port))
     sh_content = sh_content.replace("{model_info}", model_info)
-    
+
     f.write((sh_content))
 
 
@@ -101,8 +102,12 @@ import signal
 run_cmd = f"sh {sh_filename}"
 
 p = subprocess.Popen(run_cmd, shell=True, preexec_fn=os.setsid)
+
+
 def signal_handler(signal, frame):
     os.killpg(os.getpgid(p.pid), 9)
+
+
 signal.signal(signal.SIGINT, signal_handler)
 p.wait()
-print ('finish')
+print("finish")

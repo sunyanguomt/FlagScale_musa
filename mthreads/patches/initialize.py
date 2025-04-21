@@ -10,6 +10,7 @@ from datetime import timedelta
 from megatron import get_args
 from megatron.core import mpu, tensor_parallel
 
+
 def _compile_dependencies():
 
     args = get_args()
@@ -85,11 +86,13 @@ def _compile_dependencies():
 
 def set_jit_fusion_options():
     pass
-    
+
+
 megatron.initialize._compile_dependencies = _compile_dependencies
 
 import sys
+
 for k in sys.modules:
-    if k.startswith('megatron'):
-        if getattr(sys.modules[k], 'set_jit_fusion_options', None):
-            setattr(sys.modules[k], 'set_jit_fusion_options', set_jit_fusion_options)
+    if k.startswith("megatron"):
+        if getattr(sys.modules[k], "set_jit_fusion_options", None):
+            setattr(sys.modules[k], "set_jit_fusion_options", set_jit_fusion_options)

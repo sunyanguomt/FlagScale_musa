@@ -3,6 +3,7 @@ Convert a checkpoint from Megatron-LM based on different parallel configurations
 This code is based on the checkpoint_util.py in Megatron-LM, but is modifiyed to
 support the distributed optimizer conversion and not build the model during the conversion.
 """
+
 import argparse
 import importlib
 import torch.multiprocessing as mp
@@ -279,10 +280,15 @@ def get_num_layers_from_args(
     is_decoder=False,
     standalone_embedding_stage=False,
 ):
-    assert standalone_embedding_stage == False, "standalone_embedding_stage is not supported"
+    assert (
+        standalone_embedding_stage == False
+    ), "standalone_embedding_stage is not supported"
+
     def _compute_num_layers():
-        pipeline_stages = [item for sublist in hetero_pipeline_stages for item in sublist]
-        num_layers = pipeline_stages[pp_rank] 
+        pipeline_stages = [
+            item for sublist in hetero_pipeline_stages for item in sublist
+        ]
+        num_layers = pipeline_stages[pp_rank]
         return num_layers
 
     if pp_size > 1:
@@ -379,10 +385,13 @@ def main():
         default=True,
     )
     parser.add_argument(
-        '--hetero-pipeline-stages', nargs='*', type=int, default=None,
-        help='Incompatible with --num-layers-per-virtual-pipeline-stage.'
-             'hetero-pipeline-stages must be in the form:'
-             'n0 layers_0_0 layers_0_1 ... n1 nlayers_1_0 nlayers_1_1 ...'
+        "--hetero-pipeline-stages",
+        nargs="*",
+        type=int,
+        default=None,
+        help="Incompatible with --num-layers-per-virtual-pipeline-stage."
+        "hetero-pipeline-stages must be in the form:"
+        "n0 layers_0_0 layers_0_1 ... n1 nlayers_1_0 nlayers_1_1 ...",
     )
 
     known_args, _ = parser.parse_known_args()

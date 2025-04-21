@@ -1,6 +1,7 @@
 """
 This script is based on Megatron's checkpoint_saver_megatron.py, but it only saves the distributed optimizer state.
 """
+
 import argparse
 from collections.abc import Mapping
 from collections import OrderedDict
@@ -122,9 +123,9 @@ def save_checkpoint(queue, args):
         args.target_tensor_parallel_size is not None
         and args.target_pipeline_parallel_size is not None
     ):
-        os.environ[
-            "WORLD_SIZE"
-        ] = f"{args.target_tensor_parallel_size * args.target_pipeline_parallel_size}"
+        os.environ["WORLD_SIZE"] = (
+            f"{args.target_tensor_parallel_size * args.target_pipeline_parallel_size}"
+        )
 
     # We want all arguments to come from us
     sys.argv = [
@@ -335,10 +336,15 @@ def save_checkpoint(queue, args):
         optimizer_ckpt[vp_rank][dtype][state_key][full_key] = val
 
     if not args.saver_mapping_from_start:
-        param_index_map_paths = get_param_index_map_paths(md.load, tp_size, pp_size, md.iteration)
+        param_index_map_paths = get_param_index_map_paths(
+            md.load, tp_size, pp_size, md.iteration
+        )
     else:
-        param_index_map_paths = get_param_index_map_paths(margs.save, tp_size, pp_size, 0)
+        param_index_map_paths = get_param_index_map_paths(
+            margs.save, tp_size, pp_size, 0
+        )
     param_index_maps = [[None for _ in range(pp_size)] for _ in range(tp_size)]
+
     def get_param_index_map(param_index_maps, param_index_map_paths, tp_rank, pp_rank):
         if param_index_maps[tp_rank][pp_rank] is None:
             param_index_map_path = param_index_map_paths[tp_rank][pp_rank]
@@ -429,7 +435,9 @@ def save_checkpoint(queue, args):
         # Make models for first pipeline stage and fill in embeddings
         post_process = args.target_pipeline_parallel_size == 1
         for tp_rank in range(args.target_tensor_parallel_size):
-            optimizer_ckpt = get_optimizer_ckpt(optimizer_ckpts, state_key, tp_rank, 0, 0)
+            optimizer_ckpt = get_optimizer_ckpt(
+                optimizer_ckpts, state_key, tp_rank, 0, 0
+            )
             set_optimizer_state(
                 optimizer_ckpt,
                 None,
@@ -447,9 +455,13 @@ def save_checkpoint(queue, args):
             # For later pipeline parallel ranks, make the new models
             if pp_rank > 0:
                 post_process = pp_rank == args.target_pipeline_parallel_size - 1
-            num_layers = get_num_layers_from_args(md.num_layers, pp_size, pp_rank, 
-                                                  margs.hetero_pipeline_stages,
-                                                  margs.hetero_pipeline_stage_splits)
+            num_layers = get_num_layers_from_args(
+                md.num_layers,
+                pp_size,
+                pp_rank,
+                margs.hetero_pipeline_stages,
+                margs.hetero_pipeline_stage_splits,
+            )
             for layer in range(num_layers):
                 # -----------------
                 # main weight
@@ -468,13 +480,19 @@ def save_checkpoint(queue, args):
 
                 # Split up the parallel tensors
                 qkv_weight = torch.chunk(
-                    msg.pop(f"qkv weight {state_key}"), args.target_tensor_parallel_size, dim=0
+                    msg.pop(f"qkv weight {state_key}"),
+                    args.target_tensor_parallel_size,
+                    dim=0,
                 )
                 dense_weight = torch.chunk(
-                    msg.pop(f"dense weight {state_key}"), args.target_tensor_parallel_size, dim=1
+                    msg.pop(f"dense weight {state_key}"),
+                    args.target_tensor_parallel_size,
+                    dim=1,
                 )
                 mlp_l1_weight = torch.chunk(
-                    msg.pop(f"mlp l1 weight {state_key}"), args.target_tensor_parallel_size, dim=1
+                    msg.pop(f"mlp l1 weight {state_key}"),
+                    args.target_tensor_parallel_size,
+                    dim=1,
                 )
 
                 # Special handling for swiglu
@@ -494,7 +512,7 @@ def save_checkpoint(queue, args):
                         for weights in zip(mlp_l0_W_weight, mlp_l0_V_weight)
                     ]
                 else:
-                    mlp_l0_weight= torch.chunk(
+                    mlp_l0_weight = torch.chunk(
                         msg.pop(f"mlp l0 weight {state_key}"),
                         args.target_tensor_parallel_size,
                         dim=0,
@@ -502,7 +520,9 @@ def save_checkpoint(queue, args):
 
                 if md.linear_bias:
                     qkv_bias = torch.chunk(
-                        msg.pop(f"qkv bias {state_key}"), args.target_tensor_parallel_size, dim=0
+                        msg.pop(f"qkv bias {state_key}"),
+                        args.target_tensor_parallel_size,
+                        dim=0,
                     )
                     if md.swiglu:
                         mlp_l0_bias_W = torch.chunk(
@@ -680,14 +700,11 @@ def save_checkpoint(queue, args):
                         )
                 check_message(msg)
 
-
                 if md.output_layer:
                     msg = queue_get(f"output layer {state_key}")
                     # Deal with padding
                     orig_output_layer_weight = msg.pop(f"weight {state_key}")
-                    full_output_layer_weight = padding_vocab(
-                        orig_output_layer_weight
-                    )
+                    full_output_layer_weight = padding_vocab(orig_output_layer_weight)
                     output_layer_weight = torch.chunk(
                         full_output_layer_weight,
                         args.target_tensor_parallel_size,
@@ -707,7 +724,6 @@ def save_checkpoint(queue, args):
                         )
                     check_message(msg)
 
-
             for tp_rank in range(args.target_tensor_parallel_size):
                 save_optimizer_ckpt(
                     optimizer_ckpts, optimizer_ckpt_paths, state_key, tp_rank, pp_rank
@@ -717,7 +733,7 @@ def save_checkpoint(queue, args):
                         tp_rank, pp_rank
                     )
                 )
-    
+
     receive_message("param")
 
     receive_message("exp_avg")

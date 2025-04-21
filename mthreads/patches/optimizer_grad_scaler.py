@@ -20,7 +20,7 @@ class MegatronGradScaler(ABC):
     def inv_scale(self):
         return 1 / self._scale
         # TODO (yehua): Fix reciprocal in torch_musa
-        # return self._scale.double().reciprocal().float() 
+        # return self._scale.double().reciprocal().float()
 
     @abstractmethod
     def update(self, found_inf):
@@ -37,10 +37,16 @@ class MegatronGradScaler(ABC):
 
 class DynamicGradScaler(MegatronGradScaler):
 
-    def __init__(self, initial_scale, min_scale,
-                 growth_factor, backoff_factor,
-                 growth_interval, hysteresis):
-        """"Grad scaler with dynamic scale that gets adjusted
+    def __init__(
+        self,
+        initial_scale,
+        min_scale,
+        growth_factor,
+        backoff_factor,
+        growth_interval,
+        hysteresis,
+    ):
+        """ "Grad scaler with dynamic scale that gets adjusted
         during training."""
         super(DynamicGradScaler, self).__init__(initial_scale)
 
@@ -67,7 +73,6 @@ class DynamicGradScaler(MegatronGradScaler):
         self._growth_tracker = 0
         self._hysteresis_tracker = self.hysteresis
 
-
     def update(self, found_inf):
 
         # If we have an inf/nan, growth tracker is set to 0
@@ -77,8 +82,9 @@ class DynamicGradScaler(MegatronGradScaler):
             self._hysteresis_tracker -= 1
             # Now if we are out of hysteresis count, scale down the loss.
             if self._hysteresis_tracker <= 0:
-                self._scale = torch.max(self._scale * self.backoff_factor,
-                                        self.min_scale)
+                self._scale = torch.max(
+                    self._scale * self.backoff_factor, self.min_scale
+                )
         else:
             # If there is no nan/inf, increment the growth tracker.
             self._growth_tracker += 1
@@ -90,24 +96,24 @@ class DynamicGradScaler(MegatronGradScaler):
                 # and scale up the loss scale.
                 self._scale = self._scale * self.growth_factor
 
-
     def state_dict(self):
         state_dict = {}
-        state_dict['scale'] = self._scale
-        state_dict['growth_tracker'] = self._growth_tracker
-        state_dict['hysteresis_tracker'] = self._hysteresis_tracker
+        state_dict["scale"] = self._scale
+        state_dict["growth_tracker"] = self._growth_tracker
+        state_dict["hysteresis_tracker"] = self._hysteresis_tracker
         return state_dict
 
-
     def load_state_dict(self, state_dict):
-        self._scale = state_dict['scale'].musa(torch.musa.current_device())
-        self._growth_tracker = state_dict['growth_tracker']
-        self._hysteresis_tracker = state_dict['hysteresis_tracker']
+        self._scale = state_dict["scale"].musa(torch.musa.current_device())
+        self._growth_tracker = state_dict["growth_tracker"]
+        self._hysteresis_tracker = state_dict["hysteresis_tracker"]
+
 
 import sys
+
 for k in sys.modules:
-    if k.startswith('megatron.optimizer'):
-        if getattr(sys.modules[k], 'MegatronGradScaler', None):
-            setattr(sys.modules[k], 'MegatronGradScaler', MegatronGradScaler)
-        if getattr(sys.modules[k], 'DynamicGradScaler', None):
-            setattr(sys.modules[k], 'DynamicGradScaler', DynamicGradScaler)
+    if k.startswith("megatron.optimizer"):
+        if getattr(sys.modules[k], "MegatronGradScaler", None):
+            setattr(sys.modules[k], "MegatronGradScaler", MegatronGradScaler)
+        if getattr(sys.modules[k], "DynamicGradScaler", None):
+            setattr(sys.modules[k], "DynamicGradScaler", DynamicGradScaler)

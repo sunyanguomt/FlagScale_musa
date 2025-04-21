@@ -17,13 +17,14 @@ from megatron.training import pretrain
 from megatron.utils import get_ltor_masks_and_position_ids
 from megatron.utils import average_losses_across_data_parallel_group
 
+
 def model_provider(pre_process=True, post_process=True):
     """Build the model."""
 
     args = get_args()
     config = core_transformer_config_from_args(args)
 
-    print_rank_0('building GPT model ...')
+    print_rank_0("building GPT model ...")
     model = GPTModel(
         config=config,
         vocab_size=args.padded_vocab_size,
@@ -34,7 +35,7 @@ def model_provider(pre_process=True, post_process=True):
         parallel_output=True,
         share_embeddings_and_output_weights=not args.untie_embeddings_and_output_weights,
         position_embedding_type=args.position_embedding_type,
-        rotary_percent=args.rotary_percent
+        rotary_percent=args.rotary_percent,
     )
     return model
 
@@ -45,7 +46,7 @@ def get_batch(data_iterator):
     tokenizer = get_tokenizer()
 
     # Items and their type.
-    keys = ['text']
+    keys = ["text"]
     datatype = torch.int64
 
     # Broadcast data.
@@ -56,7 +57,7 @@ def get_batch(data_iterator):
     data_b = tensor_parallel.broadcast_data(keys, data, datatype)
 
     # Unpack.
-    tokens_ = data_b['text'].long()
+    tokens_ = data_b["text"].long()
     labels = tokens_[:, 1:].contiguous()
     tokens = tokens_[:, :-1].contiguous()
 
@@ -66,9 +67,11 @@ def get_batch(data_iterator):
         tokenizer.eod,
         args.reset_position_ids,
         args.reset_attention_mask,
-        args.eod_mask_loss)
+        args.eod_mask_loss,
+    )
 
     return tokens, labels, loss_mask, attention_mask, position_ids
+
 
 def loss_func(loss_mask, output_tensor):
     losses = output_tensor.float()
@@ -78,7 +81,7 @@ def loss_func(loss_mask, output_tensor):
     # Reduce loss for logging.
     averaged_loss = average_losses_across_data_parallel_group([loss])
 
-    return loss, {'lm loss': averaged_loss[0]}
+    return loss, {"lm loss": averaged_loss[0]}
 
 
 def forward_step(data_iterator, model):
@@ -87,13 +90,11 @@ def forward_step(data_iterator, model):
     timers = get_timers()
 
     # Get the batch.
-    timers('batch-generator', log_level=2).start()
-    tokens, labels, loss_mask, attention_mask, position_ids = get_batch(
-        data_iterator)
-    timers('batch-generator').stop()
+    timers("batch-generator", log_level=2).start()
+    tokens, labels, loss_mask, attention_mask, position_ids = get_batch(data_iterator)
+    timers("batch-generator").stop()
 
-    output_tensor = model(tokens, position_ids, attention_mask,
-                          labels=labels)
+    output_tensor = model(tokens, position_ids, attention_mask, labels=labels)
 
     return output_tensor, partial(loss_func, loss_mask)
 
@@ -102,8 +103,7 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
     """Build train, valid, and test datasets."""
     args = get_args()
 
-    print_rank_0('> building train, validation, and test datasets '
-                 'for GPT ...')
+    print_rank_0("> building train, validation, and test datasets " "for GPT ...")
     train_ds, valid_ds, test_ds = build_train_valid_test_datasets(
         data_prefix=args.data_path,
         data_impl=args.data_impl,
@@ -115,7 +115,8 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
         train_data_prefix=args.train_data_path,
         valid_data_prefix=args.valid_data_path,
         test_data_prefix=args.test_data_path,
-        data_cache_path=args.data_cache_path)
+        data_cache_path=args.data_cache_path,
+    )
     print_rank_0("> finished creating GPT datasets ...")
 
     return train_ds, valid_ds, test_ds
@@ -123,8 +124,10 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
 
 if __name__ == "__main__":
 
-    pretrain(train_valid_test_datasets_provider, model_provider,
-             ModelType.encoder_or_decoder,
-             forward_step,
-             args_defaults={'tokenizer_type': 'GPT2BPETokenizer'}
+    pretrain(
+        train_valid_test_datasets_provider,
+        model_provider,
+        ModelType.encoder_or_decoder,
+        forward_step,
+        args_defaults={"tokenizer_type": "GPT2BPETokenizer"},
     )

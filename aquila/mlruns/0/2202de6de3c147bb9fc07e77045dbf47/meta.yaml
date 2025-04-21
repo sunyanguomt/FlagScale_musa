@@ -1,0 +1,15 @@
+artifact_uri: file:///home/dist/qiyulei/test/FlagScale/aquila/mlruns/0/2202de6de3c147bb9fc07e77045dbf47/artifacts
+end_time: 1745225118386
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 2202de6de3c147bb9fc07e77045dbf47
+run_name: capable-auk-759
+run_uuid: 2202de6de3c147bb9fc07e77045dbf47
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1745224276816
+status: 3
+tags: []
+user_id: root

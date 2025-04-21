@@ -10,10 +10,10 @@ from ..mapping import CheckpointingException, ShardedStateDict, ShardedTensor, S
 
 
 class StrategyAction(Enum):
-    LOAD_COMMON = 'load_common'
-    LOAD_SHARDED = 'load_sharded'
-    SAVE_COMMON = 'save_common'
-    SAVE_SHARDED = 'save_sharded'
+    LOAD_COMMON = "load_common"
+    LOAD_SHARDED = "load_sharded"
+    SAVE_COMMON = "save_common"
+    SAVE_SHARDED = "save_sharded"
 
 
 default_strategies = defaultdict(dict)
@@ -24,7 +24,7 @@ def get_default_strategy(action: StrategyAction, backend: str, version: int):
         return default_strategies[action.value][(backend, version)]
     except KeyError as e:
         raise CheckpointingException(
-            f'Cannot find default strategy for: {(action, backend, version)}'
+            f"Cannot find default strategy for: {(action, backend, version)}"
         ) from e
 
 

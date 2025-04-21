@@ -11,7 +11,7 @@ import torch
 def extract_matching_values(
     x: Union[dict, list], predicate: Callable
 ) -> Tuple[Union[dict, list], Union[dict, list]]:
-    """ Return matching and nonmatching values. Keeps hierarchy. """
+    """Return matching and nonmatching values. Keeps hierarchy."""
     if isinstance(x, dict):
         matching_vals = {}
         nonmatching_vals = {}
@@ -80,45 +80,45 @@ def diff(x1: Any, x2: Any, prefix: Tuple = ()) -> Tuple[list, list, list]:
 
 
 def inspect_keys_types(d: dict, prefix: Tuple = (), indent: int = 4):
-    print_indent = lambda: print(' ' * indent * len(prefix), end='')
+    print_indent = lambda: print(" " * indent * len(prefix), end="")
     for k, v in d.items():
         if isinstance(v, dict):
             print_indent()
-            print(f'> {k}:')
+            print(f"> {k}:")
             inspect_keys_types(v, prefix + (k,), indent)
         else:
             print_indent()
             if isinstance(v, torch.Tensor):
-                print(f'> {k}: {type(v)} of shape {v.shape}')
+                print(f"> {k}: {type(v)} of shape {v.shape}")
             else:
-                print(f'> {k}: {type(v)}')
+                print(f"> {k}: {type(v)}")
 
 
 def inspect_types(x: Any, prefix: Tuple = (), indent: int = 4):
-    print_indent = lambda: print(' ' * indent * len(prefix), end='')
+    print_indent = lambda: print(" " * indent * len(prefix), end="")
     if isinstance(x, dict):
         print()
         for k, v in x.items():
             print_indent()
-            print(f'> {k}: ', end='')
+            print(f"> {k}: ", end="")
             inspect_types(v, prefix + (k,), indent)
     elif isinstance(x, list):
         print()
         for i, v in enumerate(x):
             print_indent()
-            print(f'- {i}: ', end='')
+            print(f"- {i}: ", end="")
             inspect_types(v, prefix + (i,), indent)
     else:
         if isinstance(x, torch.Tensor):
-            print(f'Tensor of shape {x.shape}')
+            print(f"Tensor of shape {x.shape}")
         else:
             try:
                 x_str = str(x)
             except:
-                x_str = '<no string repr>'
+                x_str = "<no string repr>"
             if len(x_str) > 30:
-                x_str = x_str[:30] + '... (truncated)'
-            print(f'[{type(x)}]: {x_str}')
+                x_str = x_str[:30] + "... (truncated)"
+            print(f"[{type(x)}]: {x_str}")
 
 
 def nested_values(x: Union[dict, list]):
@@ -178,11 +178,13 @@ def merge(x1: dict, x2: dict):
                 x1[k] = merge(x1[k], v2)
     elif isinstance(x1, list) and isinstance(x2, list):
         if len(x1) != len(x2):
-            raise ValueError('Cannot merge two lists with different lengths')
+            raise ValueError("Cannot merge two lists with different lengths")
         for i, v2 in enumerate(x2):
             x1[i] = merge(x1[i], v2)
     else:
-        raise ValueError(f'Duplicate non-dict and non-list values encountered: `{x1}` and `{x2}`')
+        raise ValueError(
+            f"Duplicate non-dict and non-list values encountered: `{x1}` and `{x2}`"
+        )
     return x1
 
 

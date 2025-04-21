@@ -2,6 +2,7 @@ import regex as re
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional, Tuple, Union, overload
 
+
 class Trie:
     """
     Trie in Python. Creates a Trie out of a list of words. The trie is used to split on `added_tokens` in one pass
@@ -75,7 +76,11 @@ class Trie:
                             # It wasn't updated yet so indices are current ones
                             lookahead_index = current
                             end = current
-                        next_char = text[lookahead_index] if lookahead_index < len(text) else None
+                        next_char = (
+                            text[lookahead_index]
+                            if lookahead_index < len(text)
+                            else None
+                        )
                         if "" in looktrie_pointer:
                             start = lookstart
                             end = lookahead_index

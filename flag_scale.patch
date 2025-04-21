@@ -1,0 +1,154 @@
+diff --git a/aquila/utils/convo_dataset.py b/aquila/utils/convo_dataset.py
+index bb8ed349..7bff42a9 100644
+--- a/aquila/utils/convo_dataset.py
++++ b/aquila/utils/convo_dataset.py
+@@ -221,10 +221,11 @@ if __name__ == "__main__":
+     from megatron.tokenizer.tokenizer import _AquilaTokenizer
+     tokenizer = _AquilaTokenizer(
+         '../aquila/tokenizer/vocab.json',
+-        '../aquila/tokenizer/merges.txt')
++        '../aquila/tokenizer/merges.txt',
++        "../aquila/tokenizer/special_tokens.txt")
+     print(f"{dir(tokenizer)}")
+-    train_data_prefix = ['path/to/train/set']
+-    valid_data_prefix = ['path/to/valid/set']
++    train_data_prefix = ['/home/dist/devtech_files/datasets/RedPajama-Data-1T-Sample/arxiv_sample.jsonl']
++    valid_data_prefix = []
+     train_dataset, valid_dataset, test_dataset = build_train_valid_test_datasets(
+         train_valid_test_num_samples,
+         seq_length, seed, tokenizer,
+diff --git a/megatron/megatron/arguments.py b/megatron/megatron/arguments.py
+index b630246c..17a55df0 100644
+--- a/megatron/megatron/arguments.py
++++ b/megatron/megatron/arguments.py
+@@ -1466,7 +1466,8 @@ def _add_data_args(parser):
+                                 'SentencePieceTokenizer',
+                                 'GPTSentencePieceTokenizer',
+                                 'NullTokenizer',
+-                                'AquilaTokenizer'],
++                                'AquilaTokenizer',
++                                "Llama2Tokenizer"],
+                        help='What type of tokenizer to use.')
+     group.add_argument('--tokenizer-model', type=str, default=None,
+                        help='Sentencepiece tokenizer model.')
+diff --git a/megatron/megatron/checkpointing.py b/megatron/megatron/checkpointing.py
+index 4eb362e3..fd3c897f 100644
+--- a/megatron/megatron/checkpointing.py
++++ b/megatron/megatron/checkpointing.py
+@@ -55,7 +55,7 @@ def check_checkpoint_args(checkpoint_args):
+     _compare('num_layers')
+     _compare('hidden_size')
+     _compare('num_attention_heads')
+-    _compare('add_position_embedding', default=True)
++    # _compare('add_position_embedding', default=True)
+     if args.vocab_file:
+         _compare('max_position_embeddings')
+         _compare('make_vocab_size_divisible_by')
+diff --git a/megatron/megatron/optimizer/grad_scaler.py b/megatron/megatron/optimizer/grad_scaler.py
+index 66f7c907..a34034e0 100644
+--- a/megatron/megatron/optimizer/grad_scaler.py
++++ b/megatron/megatron/optimizer/grad_scaler.py
+@@ -21,7 +21,7 @@ class MegatronGradScaler(ABC):
+ 
+     @property
+     def inv_scale(self):
+-        return self._scale.double().reciprocal().float()
++        return self._scale.float().reciprocal().float()
+ 
+     @abstractmethod
+     def update(self, found_inf):
+diff --git a/megatron/megatron/tokenizer/tokenizer.py b/megatron/megatron/tokenizer/tokenizer.py
+index 59d907c8..1d6d7d44 100644
+--- a/megatron/megatron/tokenizer/tokenizer.py
++++ b/megatron/megatron/tokenizer/tokenizer.py
+@@ -8,7 +8,7 @@ from abc import abstractmethod
+ from .bert_tokenization import FullTokenizer as FullBertTokenizer
+ from .gpt2_tokenization import GPT2Tokenizer
+ from .gpt2_tokenization import AquilaTokenizer
+-
++from transformers import AutoTokenizer
+ 
+ def build_tokenizer(args):
+     """Initialize tokenizer."""
+@@ -46,6 +46,9 @@ def build_tokenizer(args):
+         assert args.special_tokens_file is not None
+         tokenizer = _AquilaTokenizer(args.vocab_file, args.merge_file,
+                                      args.special_tokens_file)
++    elif args.tokenizer_type == 'Llama2Tokenizer':
++        assert args.tokenizer_model is not None
++        tokenizer = _Llama2Tokenizer(args.tokenizer_model)
+     else:
+         raise NotImplementedError('{} tokenizer is not '
+                                   'implemented.'.format(args.tokenizer_type))
+@@ -590,4 +593,51 @@ class _AquilaTokenizer(AbstractTokenizer):
+     def pad(self):
+         return self.pad_id
+ 
++class _Llama2Tokenizer(_SentencePieceTokenizer):
++    """SentencePieceTokenizer-Megatron wrapper"""
++
++    def __init__(self, model_file,):
++        super().__init__(model_file, vocab_extra_ids=0)
++
++    def _initalize(self, vocab_extra_ids):
++        self._populate_vocab()
++
++        # BOS / EOS token IDs
++        self.n_words: int = self.tokenizer.vocab_size()
++        self.bos_id: int = self.tokenizer.bos_id()
++        self.eos_id: int = self.tokenizer.eos_id()
++        self.pad_id: int = self.tokenizer.pad_id()
++        assert self.tokenizer.vocab_size() == self.tokenizer.get_piece_size()
++
++    def tokenize(self, s: str, bos=True, eos=False):
++        '''Default args for text completion, not chat/dialog.'''
++        assert type(s) is str
++        t = self.tokenizer.encode(s)
++        if bos:
++            t = [self.bos_id] + t
++        if eos:
++            t = t + [self.eos_id]
++        return t
++
++    def detokenize(self, ids):
++        return self.tokenizer.decode_ids(ids)
++
++    @property
++    def cls(self):
++        return -1
++
++    @property
++    def sep(self):
++        return -1
+ 
++    @property
++    def mask(self):
++        return -1
++
++    @property
++    def eod(self):
++        return self.eos_id
++
++    @property
++    def additional_special_tokens_ids(self):
++        return None
+\ No newline at end of file
+diff --git a/megatron/tools/preprocess_data.py b/megatron/tools/preprocess_data.py
+index 9c73c610..f44d4275 100644
+--- a/megatron/tools/preprocess_data.py
++++ b/megatron/tools/preprocess_data.py
+@@ -194,10 +194,13 @@ def get_args():
+     group.add_argument('--tokenizer-type', type=str, required=True,
+                        choices=['BertWordPieceLowerCase','BertWordPieceCase',
+                                 'GPT2BPETokenizer', 'SentencePieceTokenizer',
+-                                'GPTSentencePieceTokenizer', 'NullTokenizer'],
++                                'GPTSentencePieceTokenizer', 'NullTokenizer',
++                                'Llama2Tokenizer'],
+                        help='What type of tokenizer to use.')
+     group.add_argument('--tokenizer-model', type=str, default=None,
+                        help='YTTM tokenizer model.')
++    group.add_argument('--special-tokens-file', type=str, default=None,
++                       help='special tokens file.')
+     group.add_argument('--vocab-file', type=str, default=None,
+                        help='Path to the vocab file')
+     group.add_argument('--vocab-size', default=786,

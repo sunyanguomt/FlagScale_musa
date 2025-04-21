@@ -3,10 +3,10 @@ import torch_mlu
 import megatron
 from megatron.core import tensor_parallel
 
-def build_model_and_main_param_groups(cls,
-                                      model_gbuf_ranges,
-                                      param_gbuf_map,
-                                      opt_group_ranges):
+
+def build_model_and_main_param_groups(
+    cls, model_gbuf_ranges, param_gbuf_map, opt_group_ranges
+):
     """
     Create main parameter groups needed for the optimizer step.
 
@@ -44,8 +44,7 @@ def build_model_and_main_param_groups(cls,
         model_fp32_groups.append(model_fp32_params_this_group)
         shard_float16_groups.append(shard_float16_params_this_group)
         shard_fp32_groups.append(shard_fp32_params_this_group)
-        shard_fp32_from_float16_groups.append(
-            shard_fp32_from_float16_params_this_group)
+        shard_fp32_from_float16_groups.append(shard_fp32_from_float16_params_this_group)
 
         for model_param in group_range["params"]:
 
@@ -56,20 +55,25 @@ def build_model_and_main_param_groups(cls,
             param_range = gbuf_range["param_map"][model_param]["param"]
 
             # fp16, bf16 params.
-            if model_param.type() in ['torch.mlu.HalfTensor',
-                                      'torch.mlu.BFloat16Tensor',
-                                      'torch.cuda.HalfTensor',
-                                      'torch.cuda.BFloat16Tensor']:
+            if model_param.type() in [
+                "torch.mlu.HalfTensor",
+                "torch.mlu.BFloat16Tensor",
+                "torch.cuda.HalfTensor",
+                "torch.cuda.BFloat16Tensor",
+            ]:
 
                 # Clone model -> main.
-                shard_model_param = model_param.detach().view(-1) \
-                    [param_range.start:param_range.end]
+                shard_model_param = model_param.detach().view(-1)[
+                    param_range.start : param_range.end
+                ]
                 shard_main_param = shard_model_param.clone().float()
                 tensor_parallel.copy_tensor_model_parallel_attributes(
-                    shard_model_param, model_param)
+                    shard_model_param, model_param
+                )
                 tensor_parallel.copy_tensor_model_parallel_attributes(
-                    shard_main_param, model_param)
-                if hasattr(model_param, 'shared'):
+                    shard_main_param, model_param
+                )
+                if hasattr(model_param, "shared"):
                     shard_model_param.shared = model_param.shared
                     shard_main_param.shared = model_param.shared
 
@@ -79,26 +83,32 @@ def build_model_and_main_param_groups(cls,
                 shard_fp32_from_float16_params_this_group.append(shard_main_param)
 
             # fp32 params.
-            elif model_param.type() in ['torch.mlu.FloatTensor',
-                                        'torch.cuda.FloatTensor']:
-                shard_model_param = model_param.view(-1) \
-                    [param_range.start:param_range.end]
+            elif model_param.type() in [
+                "torch.mlu.FloatTensor",
+                "torch.cuda.FloatTensor",
+            ]:
+                shard_model_param = model_param.view(-1)[
+                    param_range.start : param_range.end
+                ]
                 model_fp32_params_this_group.append(model_param)
                 shard_fp32_params_this_group.append(shard_model_param)
                 tensor_parallel.copy_tensor_model_parallel_attributes(
-                    shard_model_param, model_param)
-                if hasattr(model_param, 'shared'):
+                    shard_model_param, model_param
+                )
+                if hasattr(model_param, "shared"):
                     shard_model_param.shared = model_param.shared
 
             else:
-                raise TypeError('Wrapped parameters must be one of '
-                                'torch.mlu.FloatTensor,  '
-                                'torch.mlu.HalfTensor, or '
-                                'torch.mlu.BFloat16Tensor, or'
-                                'torch.cuda.FloatTensor, or '
-                                'torch.cuda.HalfTensor, or '
-                                'torch.cuda.BFloat16Tensor. '
-                                'Received {}'.format(model_param.type()))
+                raise TypeError(
+                    "Wrapped parameters must be one of "
+                    "torch.mlu.FloatTensor,  "
+                    "torch.mlu.HalfTensor, or "
+                    "torch.mlu.BFloat16Tensor, or"
+                    "torch.cuda.FloatTensor, or "
+                    "torch.cuda.HalfTensor, or "
+                    "torch.cuda.BFloat16Tensor. "
+                    "Received {}".format(model_param.type())
+                )
 
         # Update optimizer's params.
         group_range["orig_group"]["params"] = [
@@ -113,6 +123,7 @@ def build_model_and_main_param_groups(cls,
         shard_fp32_groups,
         shard_fp32_from_float16_groups,
     )
+
 
 def load_state_dict(self, state_dict):
     """Load the state dict.
@@ -150,60 +161,77 @@ def load_state_dict(self, state_dict):
     #   the ordering of parameters within its flattened parameter state
     #   list.
     inner_state_dict = self.optimizer.state_dict()
-    state_dict_param_groups = [{
-        **group,
-        "params" : list(inner_state_dict["param_groups"][idx]["params"]),
-    } for idx, group in enumerate(state_dict["optimizer"]["param_groups"])]
+    state_dict_param_groups = [
+        {
+            **group,
+            "params": list(inner_state_dict["param_groups"][idx]["params"]),
+        }
+        for idx, group in enumerate(state_dict["optimizer"]["param_groups"])
+    ]
 
     # Allocate 'dummy' data for optimizer state (i.e., torch.empty() below)
     # - Real data is overwritten during load_parameter_state().
     state_dict_state = []
     for gbuf_range_maps in self.model_gbuf_ranges:
         for gbuf_range_map in gbuf_range_maps.values():
-            for model_param, param_range_map in \
-                gbuf_range_map["param_map"].items():
+            for model_param, param_range_map in gbuf_range_map["param_map"].items():
 
                 # Get parameter ordering information (see method docstring
                 # for details).
-                group_index, group_order = \
-                    self.model_param_group_index_map[model_param]
-                state_order = inner_state_dict["param_groups"] \
-                    [group_index]["params"][group_order]
+                group_index, group_order = self.model_param_group_index_map[model_param]
+                state_order = inner_state_dict["param_groups"][group_index]["params"][
+                    group_order
+                ]
 
                 # Allocate dummy tensors.
                 numel = len(param_range_map["gbuf_world"])
-                init_shard = lambda : torch.empty(
-                    (numel,),
-                    dtype=torch.float32,
-                    device=torch.mlu.current_device())
+                init_shard = lambda: torch.empty(
+                    (numel,), dtype=torch.float32, device=torch.mlu.current_device()
+                )
 
-                state_dict_state.append((state_order, {
-                    "exp_avg" : init_shard(),
-                    "exp_avg_sq" : init_shard(),
-                }))
+                state_dict_state.append(
+                    (
+                        state_order,
+                        {
+                            "exp_avg": init_shard(),
+                            "exp_avg_sq": init_shard(),
+                        },
+                    )
+                )
 
     # Sort by state order (see method docstring for details).
-    state_dict_state.sort(key = lambda s : s[0])
-    state_dict_state = {s[0]:s[1] for s in state_dict_state}
+    state_dict_state.sort(key=lambda s: s[0])
+    state_dict_state = {s[0]: s[1] for s in state_dict_state}
 
     # Optimizer.
-    self.optimizer.load_state_dict({
-        "state" : state_dict_state,
-        "param_groups" : state_dict_param_groups,
-    })
+    self.optimizer.load_state_dict(
+        {
+            "state": state_dict_state,
+            "param_groups": state_dict_param_groups,
+        }
+    )
 
     # Grad scaler.
-    if 'grad_scaler' not in state_dict:
+    if "grad_scaler" not in state_dict:
         if self.fp16:
-            print_rank_0('***WARNING*** found an old checkpoint, will not '
-                         'load grad scaler ...')
+            print_rank_0(
+                "***WARNING*** found an old checkpoint, will not "
+                "load grad scaler ..."
+            )
     else:
         if self.grad_scaler:
-            self.grad_scaler.load_state_dict(state_dict['grad_scaler'])
+            self.grad_scaler.load_state_dict(state_dict["grad_scaler"])
         else:
-            print_rank_0('***WARNING*** fould the grad scaler in the '
-                         'checkpoint but it is None in the class. '
-                         'Skipping loading grad scaler ...')
+            print_rank_0(
+                "***WARNING*** fould the grad scaler in the "
+                "checkpoint but it is None in the class. "
+                "Skipping loading grad scaler ..."
+            )
 
-megatron.optimizer.distrib_optimizer.DistributedOptimizer.build_model_and_main_param_groups = build_model_and_main_param_groups 
-megatron.optimizer.distrib_optimizer.DistributedOptimizer.load_state_dict = load_state_dict 
+
+megatron.optimizer.distrib_optimizer.DistributedOptimizer.build_model_and_main_param_groups = (
+    build_model_and_main_param_groups
+)
+megatron.optimizer.distrib_optimizer.DistributedOptimizer.load_state_dict = (
+    load_state_dict
+)

@@ -14,7 +14,7 @@ from megatron.core.parallel_state import (
 from megatron.core.tensor_parallel.random import CudaRNGStatesTracker
 
 # Default name for the model parallel rng tracker.
-_MODEL_PARALLEL_RNG_TRACKER_NAME = 'model-parallel-rng'
+_MODEL_PARALLEL_RNG_TRACKER_NAME = "model-parallel-rng"
 # RNG tracker object.
 _CUDA_RNG_STATE_TRACKER = CudaRNGStatesTracker()
 
@@ -28,7 +28,7 @@ def _set_cuda_rng_state(new_state, device=-1):
     with a single change: the input state is not cloned. Cloning caused
     major performance issues for +4 GPU cases.
     """
-    if hasattr(_C, '_mlu_setRNGState') and callable(_C._mlu_setRNGState):
+    if hasattr(_C, "_mlu_setRNGState") and callable(_C._mlu_setRNGState):
         # older PyTorch
         def cb():
             with device_ctx_manager(device):
@@ -36,11 +36,11 @@ def _set_cuda_rng_state(new_state, device=-1):
 
     else:
         if device == -1:
-            device = torch.device('mlu')
+            device = torch.device("mlu")
         elif isinstance(device, str):
             device = torch.device(device)
         elif isinstance(device, int):
-            device = torch.device('mlu', device)
+            device = torch.device("mlu", device)
 
         def cb():
             idx = device.index
@@ -51,15 +51,16 @@ def _set_cuda_rng_state(new_state, device=-1):
 
         _lazy_call(cb)
 
+
 def add(self, name, seed):
     """Track the rng state."""
     # Check seed is not already used.
     if seed in self.seeds_:
-        raise Exception('seed {} already exists'.format(seed))
+        raise Exception("seed {} already exists".format(seed))
     self.seeds_.add(seed)
     # Check that state is not already defined.
     if name in self.states_:
-        raise Exception('mlu rng state {} already exists'.format(name))
+        raise Exception("mlu rng state {} already exists".format(name))
     # Get the current rng state.
     orig_rng_state = torch.mlu.get_rng_state()
     # Set the new state and store it.
@@ -68,13 +69,14 @@ def add(self, name, seed):
     # Reset rng state to what it was.
     _set_cuda_rng_state(orig_rng_state)
 
+
 @contextlib.contextmanager
 def fork(self, name=_MODEL_PARALLEL_RNG_TRACKER_NAME):
     """Fork the mlu rng state, perform operations, and exit with
     the original state."""
     # Check if we have added the state
     if name not in self.states_:
-        raise Exception('mlu rng state {} is not added'.format(name))
+        raise Exception("mlu rng state {} is not added".format(name))
     # Store current rng state.
     orig_mlu_rng_state = torch.mlu.get_rng_state()
     # Set rng state to the desired one
@@ -87,6 +89,7 @@ def fork(self, name=_MODEL_PARALLEL_RNG_TRACKER_NAME):
         self.states_[name] = torch.mlu.get_rng_state()
         # And set the state to the original state we started with.
         _set_cuda_rng_state(orig_mlu_rng_state)
+
 
 def CheckpointFunctionBackward(ctx, *args):
     if not torch.autograd._is_checkpoint_valid():
@@ -123,10 +126,15 @@ def CheckpointFunctionBackward(ctx, *args):
     if isinstance(outputs, torch.Tensor):
         outputs = (outputs,)
     torch.autograd.backward(outputs, args)
-    grads = tuple(inp.grad if isinstance(inp, torch.Tensor) else inp for inp in detached_inputs)
+    grads = tuple(
+        inp.grad if isinstance(inp, torch.Tensor) else inp for inp in detached_inputs
+    )
     return (None, None) + grads
 
+
 megatron.core.tensor_parallel.random._set_cuda_rng_state = _set_cuda_rng_state
-megatron.core.tensor_parallel.random.CudaRNGStatesTracker.add = add 
-megatron.core.tensor_parallel.random.CudaRNGStatesTracker.fork = fork 
-megatron.core.tensor_parallel.random.CheckpointFunction.backward = CheckpointFunctionBackward 
+megatron.core.tensor_parallel.random.CudaRNGStatesTracker.add = add
+megatron.core.tensor_parallel.random.CudaRNGStatesTracker.fork = fork
+megatron.core.tensor_parallel.random.CheckpointFunction.backward = (
+    CheckpointFunctionBackward
+)

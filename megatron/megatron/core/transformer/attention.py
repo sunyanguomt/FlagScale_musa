@@ -28,7 +28,10 @@ class Attention(MegatronModule, ABC):
     """
 
     def __init__(
-        self, config: TransformerConfig, layer_number: int = 1, attn_mask_type=AttnMaskType.padding,
+        self,
+        config: TransformerConfig,
+        layer_number: int = 1,
+        attn_mask_type=AttnMaskType.padding,
     ):
         super().__init__(config=config)
 
@@ -38,7 +41,9 @@ class Attention(MegatronModule, ABC):
 
         # For normal attention without groups, num_query_groups == num_attention_heads,
         # so these two will be the same
-        self.query_projection_size = self.config.kv_channels * self.config.num_attention_heads
+        self.query_projection_size = (
+            self.config.kv_channels * self.config.num_attention_heads
+        )
         self.kv_projection_size = self.config.kv_channels * self.config.num_query_groups
 
         # Per attention head and per partition values.
@@ -46,14 +51,22 @@ class Attention(MegatronModule, ABC):
         self.hidden_size_per_attention_head = divide(
             self.query_projection_size, self.config.num_attention_heads
         )
-        self.num_attention_heads_per_partition = divide(self.config.num_attention_heads, world_size)
-        self.num_query_groups_per_partition = divide(self.config.num_query_groups, world_size)
-
-        self.dot_product_attention = TEDotProductAttention(
-            config=self.config, layer_number=self.layer_number, attn_mask_type=self.attn_mask_type
+        self.num_attention_heads_per_partition = divide(
+            self.config.num_attention_heads, world_size
+        )
+        self.num_query_groups_per_partition = divide(
+            self.config.num_query_groups, world_size
         )
 
-        self.checkpoint_dot_product_attention = self.config.recompute_granularity == 'selective'
+        self.dot_product_attention = TEDotProductAttention(
+            config=self.config,
+            layer_number=self.layer_number,
+            attn_mask_type=self.attn_mask_type,
+        )
+
+        self.checkpoint_dot_product_attention = (
+            self.config.recompute_granularity == "selective"
+        )
 
         # Output.
         self.linear_proj = TERowParallelLinear(
@@ -96,7 +109,9 @@ class Attention(MegatronModule, ABC):
             device=torch.cuda.current_device(),
         )
 
-    def _adjust_key_value_for_inference(self, inference_params, key, value, rotary_pos_emb):
+    def _adjust_key_value_for_inference(
+        self, inference_params, key, value, rotary_pos_emb
+    ):
         """
         Saves the generated key and value tensors to the end of the buffers in inference_params.
         Returns the full size keys and values from the provided inference_params, as well as
@@ -128,9 +143,9 @@ class Attention(MegatronModule, ABC):
             is_first_step = True
         else:
             # Get the pre-allocated buffers for this layer
-            inference_key_memory, inference_value_memory = inference_params.key_value_memory_dict[
-                self.layer_number
-            ]
+            inference_key_memory, inference_value_memory = (
+                inference_params.key_value_memory_dict[self.layer_number]
+            )
 
         batch_start = inference_params.batch_size_offset
         batch_end = batch_start + key.size(1)
@@ -139,8 +154,12 @@ class Attention(MegatronModule, ABC):
         sequence_end = sequence_start + key.size(0)
         assert sequence_end <= inference_key_memory.size(0)
         # Copy key and values.
-        inference_key_memory[sequence_start:sequence_end, batch_start:batch_end, ...] = key
-        inference_value_memory[sequence_start:sequence_end, batch_start:batch_end, ...] = value
+        inference_key_memory[
+            sequence_start:sequence_end, batch_start:batch_end, ...
+        ] = key
+        inference_value_memory[
+            sequence_start:sequence_end, batch_start:batch_end, ...
+        ] = value
         key = inference_key_memory[:sequence_end, batch_start:batch_end, ...]
         value = inference_value_memory[:sequence_end, batch_start:batch_end, ...]
 
@@ -192,7 +211,9 @@ class Attention(MegatronModule, ABC):
         # =====================
         # Get the query, key and value tensors based on the type of attention -
         # self or cross attn.
-        query, key, value = self.get_query_key_value_tensors(hidden_states, key_value_states)
+        query, key, value = self.get_query_key_value_tensors(
+            hidden_states, key_value_states
+        )
 
         # ===================================================
         # Adjust key, value, and rotary_pos_emb for inference
@@ -222,16 +243,24 @@ class Attention(MegatronModule, ABC):
         # creates a view that has the keys and values virtually repeated along their dimension to
         # match the number of queries.
         key = key.repeat_interleave(
-            self.num_attention_heads_per_partition // self.num_query_groups_per_partition, dim=2
+            self.num_attention_heads_per_partition
+            // self.num_query_groups_per_partition,
+            dim=2,
         )
         value = value.repeat_interleave(
-            self.num_attention_heads_per_partition // self.num_query_groups_per_partition, dim=2
+            self.num_attention_heads_per_partition
+            // self.num_query_groups_per_partition,
+            dim=2,
         )
 
         if self.checkpoint_dot_product_attention:
-            core_attn_out = self._checkpointed_attention_forward(query, key, value, attention_mask)
+            core_attn_out = self._checkpointed_attention_forward(
+                query, key, value, attention_mask
+            )
         else:
-            core_attn_out = self.dot_product_attention(query, key, value, attention_mask)
+            core_attn_out = self.dot_product_attention(
+                query, key, value, attention_mask
+            )
 
         # =================
         # Output. [sq, b, h]
@@ -250,9 +279,14 @@ class SelfAttention(Attention):
     """
 
     def __init__(
-        self, config: TransformerConfig, layer_number: int = 1, attn_mask_type=AttnMaskType.padding
+        self,
+        config: TransformerConfig,
+        layer_number: int = 1,
+        attn_mask_type=AttnMaskType.padding,
     ):
-        super().__init__(config=config, layer_number=layer_number, attn_mask_type=attn_mask_type)
+        super().__init__(
+            config=config, layer_number=layer_number, attn_mask_type=attn_mask_type
+        )
 
         self.linear_qkv = TELayerNormColumnParallelLinear(
             self.config.hidden_size,
@@ -274,7 +308,11 @@ class SelfAttention(Attention):
         new_tensor_shape = mixed_qkv.size()[:-1] + (
             self.num_query_groups_per_partition,
             (
-                (self.num_attention_heads_per_partition // self.num_query_groups_per_partition + 2)
+                (
+                    self.num_attention_heads_per_partition
+                    // self.num_query_groups_per_partition
+                    + 2
+                )
                 * self.hidden_size_per_attention_head
             ),
         )
@@ -295,7 +333,9 @@ class SelfAttention(Attention):
             dim=3,
         )
         # [sq, b, ng, np/ng * hn] -> [sq, b, np, hn]
-        query = query.reshape(query.size(0), query.size(1), -1, self.hidden_size_per_attention_head)
+        query = query.reshape(
+            query.size(0), query.size(1), -1, self.hidden_size_per_attention_head
+        )
 
         return query, key, value
 
@@ -308,9 +348,14 @@ class CrossAttention(Attention):
     """
 
     def __init__(
-        self, config: TransformerConfig, layer_number: int = 1, attn_mask_type=AttnMaskType.padding
+        self,
+        config: TransformerConfig,
+        layer_number: int = 1,
+        attn_mask_type=AttnMaskType.padding,
     ):
-        super().__init__(config=config, layer_number=layer_number, attn_mask_type=attn_mask_type)
+        super().__init__(
+            config=config, layer_number=layer_number, attn_mask_type=attn_mask_type
+        )
 
         if self.config.num_query_groups != self.config.num_attention_heads:
             raise ValueError(

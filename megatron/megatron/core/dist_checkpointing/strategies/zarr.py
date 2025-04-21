@@ -13,7 +13,12 @@ import zarr
 from ..core import CheckpointingException
 from ..dict_utils import dict_list_map_inplace
 from ..mapping import ShardedStateDict, ShardedTensor, is_main_replica
-from .base import LoadShardedStrategy, SaveShardedStrategy, StrategyAction, default_strategies
+from .base import (
+    LoadShardedStrategy,
+    SaveShardedStrategy,
+    StrategyAction,
+    default_strategies,
+)
 
 numpy_to_torch_dtype_dict = {
     np.bool_: torch.bool,
@@ -36,8 +41,8 @@ try:
     import tensorstore
 
     HAS_BFLOAT16 = True
-    numpy_to_torch_dtype_dict[np.dtype('bfloat16')] = torch.bfloat16
-    torch_to_numpy_dtype_dict[torch.bfloat16] = np.dtype('bfloat16')
+    numpy_to_torch_dtype_dict[np.dtype("bfloat16")] = torch.bfloat16
+    torch_to_numpy_dtype_dict[torch.bfloat16] = np.dtype("bfloat16")
 except ImportError:
     HAS_BFLOAT16 = False
 
@@ -67,10 +72,10 @@ def _create_or_open_zarr_arrays(
         #     continue
         open_kwargs = {}
         if ten.flattened_range is not None:
-            open_kwargs['synchronizer'] = zarr.ProcessSynchronizer(
-                str(checkpoint_dir / f'{ten.key}.sync')
+            open_kwargs["synchronizer"] = zarr.ProcessSynchronizer(
+                str(checkpoint_dir / f"{ten.key}.sync")
             )
-        arr = zarr.open(checkpoint_dir / ten.key, 'r+', **open_kwargs)
+        arr = zarr.open(checkpoint_dir / ten.key, "r+", **open_kwargs)
         arrays.append(arr)
     return arrays
 
@@ -92,7 +97,7 @@ def _save_to_existing_array(sharded_tensor: ShardedTensor, arr: zarr.Array):
     if x.dtype == torch.bfloat16:
         x = x.float()
         x = x.numpy()
-        x = x.astype('bfloat16')
+        x = x.astype("bfloat16")
     else:
         x = x.numpy()
 
@@ -116,13 +121,13 @@ def _create_zarr_array(sharded_tensor: ShardedTensor, checkpoint_dir: Path):
         )
     except zarr.errors.ContainsArrayError as e:
         raise CheckpointingException(
-            f'Array {checkpoint_dir / sharded_tensor.key} already exists'
+            f"Array {checkpoint_dir / sharded_tensor.key} already exists"
         ) from e
 
-    if HAS_BFLOAT16 and np_dtype == np.dtype('bfloat16'):
+    if HAS_BFLOAT16 and np_dtype == np.dtype("bfloat16"):
         arr._dtype = np_dtype
-        zarray = arr.store['.zarray']
-        arr.store['.zarray'] = zarray.replace(b'<V2', b'bfloat16')
+        zarray = arr.store[".zarray"]
+        arr.store[".zarray"] = zarray.replace(b"<V2", b"bfloat16")
     return arr
 
 
@@ -143,17 +148,20 @@ class ZarrLoadShardedStrategy(LoadShardedStrategy):
 def _load_from_array(sharded_tensor: ShardedTensor, checkpoint_dir: Path):
     assert isinstance(sharded_tensor, ShardedTensor), type(sharded_tensor)
     try:
-        arr = zarr.open(checkpoint_dir / sharded_tensor.key, 'r')
+        arr = zarr.open(checkpoint_dir / sharded_tensor.key, "r")
     except zarr.errors.PathNotFoundError as e:
         raise CheckpointingException(
-            f'Array {checkpoint_dir / sharded_tensor.key} not found'
+            f"Array {checkpoint_dir / sharded_tensor.key} not found"
         ) from e
 
-    if not sharded_tensor.allow_shape_mismatch and sharded_tensor.global_shape != arr.shape:
+    if (
+        not sharded_tensor.allow_shape_mismatch
+        and sharded_tensor.global_shape != arr.shape
+    ):
         _msg = (
-            f'Global shape mismatch for loaded ({arr.shape})'
-            f' and expected ({sharded_tensor.global_shape}) tensor'
-            f' for key {sharded_tensor.key}'
+            f"Global shape mismatch for loaded ({arr.shape})"
+            f" and expected ({sharded_tensor.global_shape}) tensor"
+            f" for key {sharded_tensor.key}"
         )
         raise CheckpointingException(_msg)
 
@@ -163,8 +171,8 @@ def _load_from_array(sharded_tensor: ShardedTensor, checkpoint_dir: Path):
 
 def postprocess_numpy_array(loaded_array, sharded_tensor, apply_flattened_range=True):
     x = loaded_array
-    if HAS_BFLOAT16 and x.dtype == np.dtype('bfloat16'):
-        x = x.astype(np.dtype('float32'))
+    if HAS_BFLOAT16 and x.dtype == np.dtype("bfloat16"):
+        x = x.astype(np.dtype("float32"))
         x = torch.from_numpy(x)
         x = x.bfloat16()
     else:
@@ -175,9 +183,9 @@ def postprocess_numpy_array(loaded_array, sharded_tensor, apply_flattened_range=
             x = pad_to_expected_shape(x, sharded_tensor)
         else:
             _msg = (
-                f'Local shape mismatch for loaded ({x.shape})'
-                f' and expected ({sharded_tensor.local_shape}) tensor'
-                f' for key {sharded_tensor.key}'
+                f"Local shape mismatch for loaded ({x.shape})"
+                f" and expected ({sharded_tensor.local_shape}) tensor"
+                f" for key {sharded_tensor.key}"
             )
             raise CheckpointingException(_msg)
 
@@ -198,7 +206,11 @@ def pad_to_expected_shape(x: torch.Tensor, expected_sharded_ten: ShardedTensor):
     # Reversed iteration order because F.pad expects so
     for x_sh, exp_sh, axis_fragm in reversed(
         list(
-            zip(x.shape, expected_sharded_ten.local_shape, expected_sharded_ten.axis_fragmentations)
+            zip(
+                x.shape,
+                expected_sharded_ten.local_shape,
+                expected_sharded_ten.axis_fragmentations,
+            )
         )
     ):
         if x_sh == exp_sh:
@@ -206,25 +218,27 @@ def pad_to_expected_shape(x: torch.Tensor, expected_sharded_ten: ShardedTensor):
         elif x_sh > exp_sh:
             assert (
                 False
-            ), f'Expected shape ({exp_sh}) smaller than actual ({x_sh}) for {repr(expected_sharded_ten)}'
+            ), f"Expected shape ({exp_sh}) smaller than actual ({x_sh}) for {repr(expected_sharded_ten)}"
         else:
             pad_args.extend((0, exp_sh - x_sh))
     # TODO: behavior control with envvar is for testing purposes only, remove it
-    if not int(os.environ.get('DIST_CKPT_PAD_REPLICATE', 0)):
+    if not int(os.environ.get("DIST_CKPT_PAD_REPLICATE", 0)):
         return torch.nn.functional.pad(x, pad_args)
 
     # unsqueeze and squeeze to get shapes supported by cudnn
-    print(f'Replicating last row for {expected_sharded_ten.key}')
+    print(f"Replicating last row for {expected_sharded_ten.key}")
     if x.dtype == torch.bfloat16:
         return (
-            torch.nn.functional.pad(x.float().unsqueeze(0), pad_args, mode='replicate')
+            torch.nn.functional.pad(x.float().unsqueeze(0), pad_args, mode="replicate")
             .squeeze(0)
             .bfloat16()
         )
-    return torch.nn.functional.pad(x.unsqueeze(0), pad_args, mode='replicate').squeeze(0)
+    return torch.nn.functional.pad(x.unsqueeze(0), pad_args, mode="replicate").squeeze(
+        0
+    )
 
 
 # default_strategies[StrategyAction.LOAD_SHARDED.value][('zarr', 1)] = ZarrLoadShardedStrategy()
-default_strategies[StrategyAction.SAVE_SHARDED.value][('zarr', 1)] = ZarrSaveShardedStrategy(
-    'zarr', 1
+default_strategies[StrategyAction.SAVE_SHARDED.value][("zarr", 1)] = (
+    ZarrSaveShardedStrategy("zarr", 1)
 )

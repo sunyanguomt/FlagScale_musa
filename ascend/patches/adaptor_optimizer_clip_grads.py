@@ -3,7 +3,9 @@ import math
 import torch
 
 
-def clip_grad_norm_fp32(parameters, grads_for_norm, max_norm, norm_type=2, model_parallel_group=None):
+def clip_grad_norm_fp32(
+    parameters, grads_for_norm, max_norm, norm_type=2, model_parallel_group=None
+):
     if isinstance(parameters, torch.Tensor):
         parameters = [parameters]
     if isinstance(grads_for_norm, torch.Tensor):
@@ -13,7 +15,7 @@ def clip_grad_norm_fp32(parameters, grads_for_norm, max_norm, norm_type=2, model
     grads = []
     for param in parameters:
         if param.grad is not None:
-            assert param.grad.type() == 'torch.cuda.FloatTensor'
+            assert param.grad.type() == "torch.cuda.FloatTensor"
             grads.append(param.grad.detach())
 
     # Norm parameters.
@@ -26,18 +28,24 @@ def clip_grad_norm_fp32(parameters, grads_for_norm, max_norm, norm_type=2, model
         total_norm = max(grad.abs().max() for grad in grads_for_norm)
         total_norm_cuda = torch.cuda.FloatTensor([float(total_norm)])
         # Take max across all model-parallel GPUs.
-        torch.distributed.all_reduce(total_norm_cuda, op=torch.distributed.ReduceOp.MAX, group=model_parallel_group)
+        torch.distributed.all_reduce(
+            total_norm_cuda,
+            op=torch.distributed.ReduceOp.MAX,
+            group=model_parallel_group,
+        )
         total_norm = total_norm_cuda[0].item()
     else:
         for grad in grads_for_norm:
             grad_norm = torch.norm(grad, norm_type)
-            total_norm += grad_norm ** norm_type
+            total_norm += grad_norm**norm_type
         if not grads_for_norm:
             grad_norm = torch.cuda.FloatTensor([0])
-            total_norm = grad_norm ** norm_type
+            total_norm = grad_norm**norm_type
 
         # Sum across all model-parallel GPUs.
-        torch.distributed.all_reduce(total_norm, op=torch.distributed.ReduceOp.SUM, group=model_parallel_group)
+        torch.distributed.all_reduce(
+            total_norm, op=torch.distributed.ReduceOp.SUM, group=model_parallel_group
+        )
         total_norm = total_norm.item() ** (1.0 / norm_type)
 
     # Scale.
@@ -49,5 +57,5 @@ def clip_grad_norm_fp32(parameters, grads_for_norm, max_norm, norm_type=2, model
 
 
 for k, v in sys.modules.items():
-    if 'megatron' in k and hasattr(v, 'clip_grad_norm_fp32'):
-        setattr(v, 'clip_grad_norm_fp32', clip_grad_norm_fp32)
+    if "megatron" in k and hasattr(v, "clip_grad_norm_fp32"):
+        setattr(v, "clip_grad_norm_fp32", clip_grad_norm_fp32)
