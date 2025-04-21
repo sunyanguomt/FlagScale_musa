@@ -1,0 +1,67 @@
+diff --git a/tools/checkpoint_conversion/llama_checkpoint_conversion.py b/tools/checkpoint_conversion/llama_checkpoint_conversion.py
+index a5f9962..9ffa027 100644
+--- a/tools/checkpoint_conversion/llama_checkpoint_conversion.py
++++ b/tools/checkpoint_conversion/llama_checkpoint_conversion.py
+@@ -23,7 +23,7 @@ import types
+ import torch
+ 
+ from transformers import LlamaConfig
+-from transformers.modeling_utils import WEIGHTS_INDEX_NAME, WEIGHTS_NAME, shard_checkpoint
++# from transformers.modeling_utils import WEIGHTS_INDEX_NAME, WEIGHTS_NAME, shard_checkpoint
+ 
+ 
+ def add_checkpointing_args(parser):
+@@ -285,9 +285,9 @@ def convert_checkpoint_from_megatron_to_transformers(args):
+         args (argparse.Namespace): the arguments to the script
+     """
+     # Search in directory above this
+-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
+-    if args.megatron_path is not None:
+-        sys.path.insert(0, args.megatron_path)
++    # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
++    # if args.megatron_path is not None:
++    #     sys.path.insert(0, args.megatron_path)
+ 
+     # Load Megatron-LM checkpoint arguments from the state dict
+     sub_dirs = os.listdir(args.load_path)
+@@ -553,13 +553,14 @@ def convert_checkpoint_from_transformers_to_megatron(args):
+ 
+     try:
+         from megatron.tokenizer.tokenizer import _vocab_size_with_padding
+-        from megatron.fs_utils import create_read_file_system
++        # from megatron.fs_utils import create_read_file_system
+     except ModuleNotFoundError:
+         print("Unable to import Megatron, please specify the path to Megatron using --megatron-path. Exiting.")
+         exit(1)
+ 
+     # load the transformers model state dict and config
+     sub_dirs = [x for x in os.listdir(args.load_path) if x.startswith("pytorch_model")]
++    
+     if len(sub_dirs) == 1:
+         checkpoint_name = "pytorch_model.bin"
+         state_dict = torch.load(os.path.join(args.load_path, checkpoint_name), map_location="cpu")
+@@ -591,7 +592,7 @@ def convert_checkpoint_from_transformers_to_megatron(args):
+         "data_parallel_size": args.target_data_parallel_size,
+         "make_vocab_size_divisible_by": args.make_vocab_size_divisible_by,
+         "rank": 0,
+-        "tokenizer_type": "GPT2BPETokenizer",
++        "tokenizer_type": "Llama2Tokenizer",
+     }
+ 
+     margs = types.SimpleNamespace()
+@@ -800,12 +801,13 @@ def convert_checkpoint_from_transformers_to_megatron(args):
+                     output_state_dict[i], "model.language_model.encoder")
+                 params_dict[layer_name] = params.clone().detach().contiguous()
+ 
++            emb_size_for_tp = config.vocab_size // args.target_tensor_model_parallel_size
+             # add the LM head
+             for i in range(args.target_tensor_model_parallel_size):
+                 params_dict = get_element_from_dict_by_path(
+-                    output_state_dict[i], "model.lm_head")
++                    output_state_dict[i], "model.language_model.output_layer")
+                 params_dict["weight"] = state_dict['lm_head.weight'].to(
+-                    dtype).clone().detach().contiguous()
++                    dtype).clone().detach().contiguous()[i * emb_size_for_tp: (i + 1) * emb_size_for_tp]
+ 
+         # saving the state dict as per the tp_rank and pp_rank
+         for tp_rank in range(args.target_tensor_model_parallel_size):
